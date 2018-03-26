@@ -99,7 +99,12 @@ if __name__ == "__main__":
     from argparse import ArgumentParser
 
     parser = ArgumentParser(
-        description='Compare different LASSO methods in terms of full modle FDR and Power')
+        description='''
+Compare different LASSO methods in terms of full model FDR and Power.
+
+Try:
+    python compare.py --instance indep_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile indep.html
+''')
     parser.add_argument('--instance',
                         dest='instance', help='Which instance to generate data from -- only one choice. To see choices run --list_instances.')
     parser.add_argument('--list_instances',
