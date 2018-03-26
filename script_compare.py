@@ -3,32 +3,8 @@ import time
 import numpy as np
 import pandas as pd
 
-from utils import (AR_instance,
-                   equicor_instance,
-                   mixed_instance,
-                   jelena_instance,
-                   indep_instance,
-                   lagrange_vals)
-
-from methods import (knockoffs_mf, 
-                     knockoffs_orig,
-                     liu_theory,
-                     liu_CV,
-                     liu_1se, 
-                     randomized_lasso_full,
-                     randomized_lasso_full_1se,
-                     randomized_lasso_full_CV,
-                     lee_theory, 
-                     lee_CV,
-                     lee_1se,
-                     randomized_lasso, 
-                     randomized_lasso_half, 
-                     randomized_lasso_half_1se,
-                     randomized_lasso_half_CV,
-                     randomized_sqrtlasso, 
-                     randomized_sqrtlasso_half, 
-                     randomized_lasso_CV, 
-                     randomized_lasso_1se)
+from utils import instances, lagrange_vals
+from methods import methods
 
 def compare(instance, nsim=50, q=0.2,
             methods=[], verbose=False,
@@ -39,7 +15,7 @@ def compare(instance, nsim=50, q=0.2,
     for i in range(nsim):
 
         X, Y, beta = instance.generate()
-        l_theory, l_min, l_1se = lagrange_vals(X, Y)
+        l_min, l_1se, l_theory = lagrange_vals(X, Y)
         true_active = set(np.nonzero(beta)[0])
 
         def summary(result):
@@ -83,12 +59,75 @@ def compare(instance, nsim=50, q=0.2,
 
     return df
 
-instance = indep_instance(n=800, p=300, s=20, signal_fac=1.2)
-results = compare(instance,
-                  nsim=100,
-                  methods=[randomized_lasso, 
-                           randomized_lasso_half, 
-                           ],
-                  verbose=True,
-                  htmlfile='lowdim.html')
+
+def main(opts):
+
+    if opts.list_instances:
+        print('Instances:\n')
+        print(sorted(instances.keys()))
+    if opts.list_methods:
+        print('Methods:\n')
+        print(sorted(methods.keys()))
+    if opts.list_instances or opts.list_methods:
+        return
+
+    _methods = [methods[n] for n in opts.methods]
+    _instance = instances[opts.instance]
+
+    if opts.instance in ['jelena_instance', 'jelena_instance_AR']:
+        instance = _instance()
+    elif not opts.rho:
+        instance = _instance(n=opts.nsample,
+                             p=opts.nfeature,
+                             s=opts.nsignal,
+                             signal_fac=opts.signal_fac)
+    else:
+        instance = _instance(n=opts.nsample,
+                             p=opts.nfeature,
+                             s=opts.nsignal,
+                             signal_fac=opts.signal_fac,
+                             rho=rho)
+
+    results = compare(instance,
+                      nsim=opts.nsim,
+                      methods=_methods,
+                      verbose=opts.verbose,
+                      htmlfile=opts.htmlfile)
+
+if __name__ == "__main__":
+
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser(
+        description='Compare different LASSO methods in terms of full modle FDR and Power')
+    parser.add_argument('--instance',
+                        dest='instance', help='Which instance to generate data from -- only one choice. To see choices run --list_instances.')
+    parser.add_argument('--list_instances',
+                        dest='list_instances', action='store_true')
+    parser.add_argument('--methods', nargs='+', help='Which methods to use -- choose many. To see choices run --list_methods.', dest='methods')
+    parser.add_argument('--list_methods',
+                        dest='list_methods', action='store_true')
+    parser.add_argument('--nsample', default=800, type=int,
+                        help='number of data points, n (default 800)')
+    parser.add_argument('--nfeature', default=300, type=int,
+                        help='the number of features, p (default 300)')
+    parser.add_argument('--nsignal', default=20, type=int,
+                        help='the number of nonzero coefs, s (default 20)')
+    parser.add_argument('--signal_fac', default=1.2, type=float,
+                        help='Scale applied to theoretical lambda to get signal size.')
+    parser.add_argument('--rho', type=float,
+                        dest='rho',
+                        help='Value of AR(1), equicor or mixed param.')
+    parser.add_argument('--q', default=0.2, type=float,
+                        help='target for FDR (default 0.2)')
+    parser.add_argument('--nsim', default=100, type=int,
+                        help='How many repetitions?')
+    parser.add_argument('--verbose', action='store_true',
+                        dest='verbose')
+    parser.add_argument('--htmlfile', help='HTML file to store results.',
+                        dest='htmlfile')
+
+    opts = parser.parse_args()
+
+    main(opts)
 

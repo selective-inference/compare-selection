@@ -15,10 +15,16 @@ from selection.tests.instance import gaussian_instance
 def randomize_signs(beta):
     return beta * np.random.binomial(1, 0.5, size=beta.shape)
 
+instances = {}
+
 class instance(object):
 
     def generate(self):
         raise NotImplementedError('abstract method should return (X,Y,beta)')
+
+    @classmethod
+    def register(cls):
+        instances[cls.__name__] = cls
 
 class equicor_instance(instance):
 
@@ -63,6 +69,7 @@ class equicor_instance(instance):
         Y = X.dot(beta) + np.random.standard_normal(n)
 
         return X, Y, beta
+equicor_instance.register()
 
 class jelena_instance(instance):
 
@@ -72,19 +79,10 @@ class jelena_instance(instance):
     s = 30
     signal = np.sqrt(2 * np.log(p) / n)
 
-    @property
-    def params(self):
-        val = {'n':self.n,
-               'p':self.p,
-               's':self.s,
-               'signal':self.signal,
-               'name':self.name}
-        return val
-
     def generate(self):
 
         n, p, s = self.n, self.p, self.s
-        X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=rho, s=s)[0]
+        X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=0., s=s)[0]
         X /= np.sqrt((X**2).sum(0))[None, :] 
 
         beta = np.zeros(p)
@@ -95,6 +93,46 @@ class jelena_instance(instance):
         Y = X.dot(beta) + np.random.standard_normal(n)
 
         return X, Y, beta
+
+    @property
+    def params(self):
+        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal]],
+                          columns=['name', 'n', 'p', 's', 'signal'])
+        return df
+
+jelena_instance.register()
+
+class jelena_instance_AR(instance):
+
+    name = 'Jelena AR(0.5)'
+    n = 1000
+    p = 2000
+    s = 30
+    signal = np.sqrt(2 * np.log(p) / n)
+    rho = 0.5
+
+    def generate(self):
+
+        n, p, s = self.n, self.p, self.s
+        X = gaussian_instance(n=n, p=p, equicorrelated=False, rho=self.rho, s=s)[0]
+        X /= np.sqrt((X**2).sum(0))[None, :] 
+
+        beta = np.zeros(p)
+        beta[:s] = self.signal
+        beta = randomize_signs(beta)
+
+        X *= np.sqrt(n)
+        Y = X.dot(beta) + np.random.standard_normal(n)
+
+        return X, Y, beta
+
+    @property
+    def params(self):
+        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.rho, self.signal]],
+                          columns=['name', 'n', 'p', 's', 'rho', 'signal'])
+        return df
+
+jelena_instance_AR.register()
 
 class mixed_instance(equicor_instance):
 
@@ -126,6 +164,7 @@ class mixed_instance(equicor_instance):
         Y = X.dot(beta) + np.random.standard_normal(n)
 
         return X, Y, beta
+mixed_instance.register()
 
 class indep_instance(equicor_instance):
 
@@ -137,6 +176,7 @@ class indep_instance(equicor_instance):
          self.s,
          self.signal_fac) = (n, p, s, signal_fac)
         self.rho = 0.
+indep_instance.register()
 
 class AR_instance(equicor_instance):
 
@@ -158,6 +198,7 @@ class AR_instance(equicor_instance):
         Y = X.dot(beta) + np.random.standard_normal(n)
 
         return X, Y, beta
+AR_instance.register()
 
 def lagrange_vals(X, Y):
     n, p = X.shape
@@ -172,7 +213,8 @@ def lagrange_vals(X, Y):
     L = rpy.r('L')
     L1 = rpy.r('L1')
     numpy2ri.deactivate()
-    l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+    Xn = X / np.sqrt((X**2).sum(0))[None, :] 
+    l_theory = np.fabs(Xn.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
     return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory
 
 
