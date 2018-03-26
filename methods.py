@@ -410,7 +410,7 @@ randomized_lasso_half.register(), randomized_lasso_half_CV.register(), randomize
 
 class randomized_sqrtlasso(generic_method):
 
-    method_name = "Randomized SqrtLASSO + theory (selected)"
+    method_name = "Randomized SqrtLASSO, kappa=0.7, (selected)"
     randomizer_scale = 1
     kappa = 0.7
     ndraw = 5000
@@ -443,7 +443,7 @@ class randomized_sqrtlasso(generic_method):
 
 class randomized_sqrtlasso_half(randomized_sqrtlasso):
 
-    method_name = "Randomized SqrtLASSO + theory, smaller noise (selected)"
+    method_name = "Randomized SqrtLASSO, kappa=0.7, smaller noise (selected)"
     randomizer_scale = 0.5
     kappa = 0.7
 
@@ -453,14 +453,14 @@ randomized_sqrtlasso.register(), randomized_sqrtlasso_half.register()
 
 class randomized_sqrtlasso_bigger(randomized_sqrtlasso):
 
-    method_name = "Randomized SqrtLASSO + theory, kappa=0.8 (selected)"
+    method_name = "Randomized SqrtLASSO, kappa=0.8 (selected)"
     kappa = 0.8
 
     pass
 
 class randomized_sqrtlasso_bigger_half(randomized_sqrtlasso):
 
-    method_name = "Randomized SqrtLASSO + theory, smaller noise, kappa=0.8 (selected)"
+    method_name = "Randomized SqrtLASSO, kappa=0.8, smaller noise (selected)"
     kappa = 0.8
     randomizer_scale = 0.5
     pass
