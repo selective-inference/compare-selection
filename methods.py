@@ -48,7 +48,7 @@ class knockoffs_mf(generic_method):
             rpy.r('if (length(V) > 0) {V = V-1}')
             V = rpy.r('V')
             numpy2ri.deactivate()
-            return np.asarray(V, np.int), None
+            return np.asarray(V, np.int), np.asarray(V, np.int)
         except:
             return None, None
 
@@ -65,7 +65,7 @@ class knockoffs_orig(generic_method):
             rpy.r('if (length(V) > 0) {V = V-1}')
             V = rpy.r('V')
             numpy2ri.deactivate()
-            return np.asarray(V, np.int), None
+            return np.asarray(V, np.int), np.asarray(V, np.int)
         except:
             return None, None
 
@@ -83,10 +83,9 @@ class knockoffs_fixed(generic_method):
             rpy.r('if (length(V) > 0) {V = V-1}')
             V = rpy.r('V')
             numpy2ri.deactivate()
-            return np.asarray(V, np.int), None
+            return np.asarray(V, np.int), np.asarray(V, np.int)
         except:
             return None, None
-
 
 # Liu, Markovic, Tibs selection
 # put this into library!
@@ -131,7 +130,7 @@ class liu_theory(generic_method):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
 
-        self.lagrange = l_theory * np.std(Y)
+        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1])
 
     def select(self):
         X, Y, lagrange = self.X, self.Y, self.lagrange
@@ -176,7 +175,7 @@ class liu_CV(liu_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_min * np.std(Y)
+        self.lagrange = l_min * np.std(Y) * np.ones(X.shape[1])
 
 class liu_1se(liu_theory):
             
@@ -185,7 +184,7 @@ class liu_1se(liu_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_1se * np.std(Y)
+        self.lagrange = l_1se * np.std(Y) * np.ones(X.shape[1])
 
 # Unrandomized selected
 
@@ -196,7 +195,7 @@ class lee_theory(generic_method):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_theory * np.std(Y)
+        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1])
 
     def select(self):
         X, Y, lagrange = self.X, self.Y, self.lagrange
@@ -224,7 +223,7 @@ class lee_CV(lee_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_min * np.std(Y)
+        self.lagrange = l_min * np.std(Y) * np.ones(X.shape[1])
 
 class lee_1se(lee_theory):
     
@@ -233,7 +232,7 @@ class lee_1se(lee_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_1se * np.std(Y)
+        self.lagrange = l_1se * np.std(Y) * np.ones(X.shape[1])
 
 class lee_agressive(lee_theory):
     
@@ -242,7 +241,7 @@ class lee_agressive(lee_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = 0.8 * l_theory
+        self.lagrange = 0.8 * l_theory * np.ones(X.shape[1])
 
 # Randomized selected
 
@@ -257,7 +256,7 @@ class randomized_lasso(generic_method):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_theory * np.std(Y)
+        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1])
 
     def select(self):
         X, Y, lagrange = self.X, self.Y, self.lagrange
@@ -290,7 +289,7 @@ class randomized_lasso_CV(randomized_lasso):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_min * np.std(Y)
+        self.lagrange = l_min * np.std(Y) * np.ones(X.shape[1])
 
 class randomized_lasso_1se(randomized_lasso):
 
@@ -299,7 +298,7 @@ class randomized_lasso_1se(randomized_lasso):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_1se * np.std(Y)
+        self.lagrange = l_1se * np.std(Y) * np.ones(X.shape[1])
 
 # Randomized selected smaller randomization
 
@@ -413,7 +412,7 @@ class randomized_lasso_full_CV(randomized_lasso_full):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_min * np.std(Y)
+        self.lagrange = l_min * np.std(Y) * np.ones(X.shape[1])
 
 class randomized_lasso_full_1se(randomized_lasso_full):
 
@@ -422,4 +421,4 @@ class randomized_lasso_full_1se(randomized_lasso_full):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_1se * np.std(Y)
+        self.lagrange = l_1se * np.std(Y) * np.ones(X.shape[1])

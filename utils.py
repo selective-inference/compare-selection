@@ -1,5 +1,7 @@
 from scipy.stats import norm as ndist
 import numpy as np
+import pandas as pd
+
 import regreg.api as rr
 
 # Rpy
@@ -13,108 +15,152 @@ from selection.tests.instance import gaussian_instance
 def randomize_signs(beta):
     return beta * np.random.binomial(1, 0.5, size=beta.shape)
 
-def equicor_instance(n=500, p=200, s=20, rho=0.5, signal_fac=1.5):
+class instance(object):
 
-    X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=rho, s=s)[0]
-    X /= np.sqrt((X**2).sum(0))[None, :] 
-    l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+    def generate(self):
+        raise NotImplementedError('abstract method should return (X,Y,beta)')
 
-    beta = np.zeros(p)
-    beta[:s] = signal_fac * np.max(l_theory)
-    beta = randomize_signs(beta)
+class equicor_instance(instance):
 
-    X *= np.sqrt(n)
-    beta /= np.sqrt(n)
-    Y = X.dot(beta) + np.random.standard_normal(n)
+    name = 'Exchangeable'
 
-    return X, Y, beta, l_theory
+    def __init__(self, n=500, p=200, s=20, rho=0.5, signal_fac=1.5):
+        (self.n,
+         self.p,
+         self.s,
+         self.rho, 
+         self.signal_fac) = (n, p, s, rho, signal_fac)
 
-def jelena_instance(n=1000, p=2000, s=30, rho=0., signal_fac=None):
+    @property
+    def params(self):
+        if not hasattr(self, 'rho'):
+            df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal]],
+                              columns=['name', 'n', 'p', 's', 'signal'])
+        else:
+            df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal, self.rho]],
+                              columns=['name', 'n', 'p', 's', 'signal', 'rho'])
+        return df
 
-    X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=rho, s=s)[0]
-    X /= np.sqrt((X**2).sum(0))[None, :] 
-    l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+    def generate(self):
 
-    beta = np.zeros(p)
-    beta[:s] = np.sqrt(2 * np.log(p))
-    beta = randomize_signs(beta)
+        (n, p, s, rho, signal_fac) = (self.n,
+                                      self.p,
+                                      self.s,
+                                      self.rho, 
+                                      self.signal_fac)
 
-    X *= np.sqrt(n)
-    beta /= np.sqrt(n)
-    Y = X.dot(beta) + np.random.standard_normal(n)
+        X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=rho, s=s)[0]
+        X /= np.sqrt((X**2).sum(0))[None, :] 
 
-    return X, Y, beta, l_theory
+        beta = np.zeros(p)
+        l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+        self.signal = signal_fac * np.max(l_theory)
+        beta[:s] = self.signal
+        beta = randomize_signs(beta)
 
-def jelena_instance2(n=1000, p=2000, s=30, rho=0., signal_fac=None):
+        X *= np.sqrt(n)
+        beta /= np.sqrt(n)
+        Y = X.dot(beta) + np.random.standard_normal(n)
 
-    X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=rho, s=s)[0]
-    X /= np.sqrt((X**2).sum(0))[None, :] 
-    l_theory = 0.8 * np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+        return X, Y, beta
 
-    beta = np.zeros(p)
-    beta[:s] = np.sqrt(2 * np.log(p))
-    beta = randomize_signs(beta)
+class jelena_instance(instance):
 
-    X *= np.sqrt(n)
-    beta /= np.sqrt(n)
-    Y = X.dot(beta) + np.random.standard_normal(n)
+    name = 'Jelena'
+    n = 1000
+    p = 2000
+    s = 30
+    signal = np.sqrt(2 * np.log(p) / n)
 
-    return X, Y, beta, l_theory
+    @property
+    def params(self):
+        val = {'n':self.n,
+               'p':self.p,
+               's':self.s,
+               'signal':self.signal,
+               'name':self.name}
+        return val
 
-def mixed_instance(n=800, p=300, s=20, rho=0.5, signal_fac=1.5):
+    def generate(self):
 
-    X0 = gaussian_instance(n=n, p=p, equicorrelated=True, rho=0.25)[0]
-    X1 = gaussian_instance(n=n, p=p, equicorrelated=False, rho=rho)[0]
+        n, p, s = self.n, self.p, self.s
+        X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=rho, s=s)[0]
+        X /= np.sqrt((X**2).sum(0))[None, :] 
 
-    X = X0 + X1
-    X /= np.sqrt((X**2).sum(0))[None, :] 
-    l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+        beta = np.zeros(p)
+        beta[:s] = self.signal
+        beta = randomize_signs(beta)
 
-    beta = np.zeros(p)
-    beta[:s] = signal_fac * np.max(l_theory)
-    np.random.shuffle(beta)
-    beta = randomize_signs(beta)
+        X *= np.sqrt(n)
+        Y = X.dot(beta) + np.random.standard_normal(n)
 
-    X *= np.sqrt(n)
-    beta /= np.sqrt(n)
-    Y = X.dot(beta) + np.random.standard_normal(n)
+        return X, Y, beta
 
-    return X, Y, beta, l_theory
+class mixed_instance(equicor_instance):
 
-def indep_instance(n=800, p=300, s=20, rho=0.5, signal_fac=1.5):
+    name = 'Mixed'
 
-    X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=0.)[0]
-    X /= np.sqrt((X**2).sum(0))[None, :] 
-    l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+    def generate(self):
 
-    beta = np.zeros(p)
-    beta[:s] = signal_fac * np.max(l_theory)
-    np.random.shuffle(beta)
-    beta = randomize_signs(beta)
+        (n, p, s, rho, signal_fac) = (self.n,
+                                      self.p,
+                                      self.s,
+                                      self.rho, 
+                                      self.signal_fac)
 
-    X *= np.sqrt(n)
-    beta /= np.sqrt(n)
-    Y = X.dot(beta) + np.random.standard_normal(n)
+        X0 = gaussian_instance(n=n, p=p, equicorrelated=True, rho=0.25)[0]
+        X1 = gaussian_instance(n=n, p=p, equicorrelated=False, rho=rho)[0]
 
-    return X, Y, beta, l_theory
+        X = X0 + X1
+        X /= np.sqrt((X**2).sum(0))[None, :] 
 
-def AR_instance(rho=0.75, signal_fac=1.5, n=300, p=100, s=20):
+        beta = np.zeros(p)
+        l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+        self.signal = signal_fac * np.max(l_theory)
+        beta[:s] = self.signal
+        np.random.shuffle(beta)
+        beta = randomize_signs(beta)
 
-    X = gaussian_instance(n=n, p=p, equicorrelated=False, rho=rho)[0]
-    l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+        X *= np.sqrt(n)
+        beta /= np.sqrt(n)
+        Y = X.dot(beta) + np.random.standard_normal(n)
 
-    beta = np.zeros(p)
-    beta[:s] = signal_fac * np.max(l_theory)
-    np.random.shuffle(beta)
-    beta = randomize_signs(beta)
+        return X, Y, beta
 
-    X *= np.sqrt(n)
-    beta /= np.sqrt(n)
-    Y = X.dot(beta) + np.random.standard_normal(n)
+class indep_instance(equicor_instance):
 
-    return X, Y, beta, l_theory
+    name = 'Independent'
 
-def lagrange_min(X, Y):
+    def __init__(self, n=500, p=200, s=20, signal_fac=1.5):
+        (self.n,
+         self.p,
+         self.s,
+         self.signal_fac) = (n, p, s, signal_fac)
+        self.rho = 0.
+
+class AR_instance(equicor_instance):
+
+    name = 'AR'
+
+    def generate(self):
+
+        n, p, s, rho, signal_fac = self.n, self.p, self.s, self.rho, self.signal_fac
+        X = gaussian_instance(n=n, p=p, equicorrelated=False, rho=rho)[0]
+        l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+        beta = np.zeros(p)
+        self.signal = signal_fac * np.max(l_theory)
+        beta[:s] = self.signal
+        np.random.shuffle(beta)
+        beta = randomize_signs(beta)
+
+        X *= np.sqrt(n)
+        beta /= np.sqrt(n)
+        Y = X.dot(beta) + np.random.standard_normal(n)
+
+        return X, Y, beta
+
+def lagrange_vals(X, Y):
+    n, p = X.shape
     numpy2ri.activate()
     rpy.r.assign('X', X)
     rpy.r.assign('Y', Y)
@@ -126,7 +172,8 @@ def lagrange_min(X, Y):
     L = rpy.r('L')
     L1 = rpy.r('L1')
     numpy2ri.deactivate()
-    return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0])
+    l_theory = np.fabs(X.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
+    return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory
 
 
 def BHfilter(pval, q=0.2):
