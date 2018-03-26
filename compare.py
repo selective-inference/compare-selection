@@ -12,10 +12,12 @@ def compare(instance, nsim=50, q=0.2,
     
     results = [[] for m in methods]
     
+    runCV = np.any(['CV' in m.method_name for m in methods] + ['1se' in m.method_name for m in methods])
+
     for i in range(nsim):
 
         X, Y, beta = instance.generate()
-        l_min, l_1se, l_theory = lagrange_vals(X, Y)
+        l_min, l_1se, l_theory = lagrange_vals(X, Y, runCV=runCV)
         true_active = set(np.nonzero(beta)[0])
 
         def summary(result):
@@ -75,7 +77,7 @@ def main(opts):
     _methods = [methods[n] for n in opts.methods]
     _instance = instances[opts.instance]
 
-    if opts.instance in ['jelena_instance', 'jelena_instance_AR']:
+    if opts.instance in ['jelena_instance', 'jelena_instance_AR', 'jelena_instance_flip']:
         instance = _instance()
     elif not opts.rho:
         instance = _instance(n=opts.nsample,

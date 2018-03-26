@@ -97,11 +97,43 @@ class jelena_instance(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal]],
+        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
                           columns=['name', 'n', 'p', 's', 'signal'])
         return df
 
 jelena_instance.register()
+
+class jelena_instance_flip(instance):
+
+    name = 'Jelena, n=5000'
+    n = 5000
+    p = 2000
+    s = 30
+    signal = np.sqrt(2 * np.log(p) / n)
+
+    def generate(self):
+
+        n, p, s = self.n, self.p, self.s
+        X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=0., s=s)[0]
+        X /= np.sqrt((X**2).sum(0))[None, :] 
+
+        beta = np.zeros(p)
+        beta[:s] = self.signal
+        beta = randomize_signs(beta)
+        np.random.shuffle(beta)
+
+        X *= np.sqrt(n)
+        Y = X.dot(beta) + np.random.standard_normal(n)
+
+        return X, Y, beta
+
+    @property
+    def params(self):
+        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
+                          columns=['name', 'n', 'p', 's', 'signal'])
+        return df
+
+jelena_instance_flip.register()
 
 class jelena_instance_AR(instance):
 
@@ -130,7 +162,7 @@ class jelena_instance_AR(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.rho, self.signal]],
+        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.rho, self.signal * np.sqrt(self.n)]],
                           columns=['name', 'n', 'p', 's', 'rho', 'signal'])
         return df
 
@@ -202,23 +234,27 @@ class AR_instance(equicor_instance):
         return X, Y, beta
 AR_instance.register()
 
-def lagrange_vals(X, Y):
+def lagrange_vals(X, Y, runCV=True):
     n, p = X.shape
-    numpy2ri.activate()
-    rpy.r.assign('X', X)
-    rpy.r.assign('Y', Y)
-    rpy.r('X=as.matrix(X)')
-    rpy.r('Y=as.numeric(Y)')
-    rpy.r('G = cv.glmnet(X, Y, intercept=FALSE, standardize=FALSE)')
-    rpy.r("L = G[['lambda.min']]")
-    rpy.r("L1 = G[['lambda.1se']]")
-    L = rpy.r('L')
-    L1 = rpy.r('L1')
-    numpy2ri.deactivate()
+
     Xn = X / np.sqrt((X**2).sum(0))[None, :] 
     l_theory = np.fabs(Xn.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p) * np.std(Y)
-    return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory 
 
+    if runCV:
+        numpy2ri.activate()
+        rpy.r.assign('X', X)
+        rpy.r.assign('Y', Y)
+        rpy.r('X=as.matrix(X)')
+        rpy.r('Y=as.numeric(Y)')
+        rpy.r('G = cv.glmnet(X, Y, intercept=FALSE, standardize=FALSE)')
+        rpy.r("L = G[['lambda.min']]")
+        rpy.r("L1 = G[['lambda.1se']]")
+        L = rpy.r('L')
+        L1 = rpy.r('L1')
+        numpy2ri.deactivate()
+        return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory 
+    else:
+        return None, None, l_theory
 
 def BHfilter(pval, q=0.2):
     numpy2ri.activate()
