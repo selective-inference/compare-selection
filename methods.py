@@ -222,7 +222,7 @@ class lee_theory(generic_method):
         X = X / np.sqrt(n)
         L = lasso.gaussian(X, Y, lagrange)
         L.fit()
-        try:
+        if len(L.active) > 0:
             S = L.summary(compute_intervals=False, alternative='onesided')
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
@@ -231,7 +231,7 @@ class lee_theory(generic_method):
                 selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
             else:
                 selected = []
-        except:
+        else:
             selected, active_set = [], []
         return selected, active_set
 
