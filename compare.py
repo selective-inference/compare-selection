@@ -23,7 +23,8 @@ def compare(instance, nsim=50, q=0.2,
         def summary(result):
             result = np.atleast_2d(result)
 
-            return [np.mean(result[:,0]), 
+            return [result.shape[0],
+                    np.mean(result[:,0]), 
                     np.std(result[:,0]) / np.sqrt(result.shape[0]), 
                     np.mean(result[:,1]), 
                     np.mean(result[:,2]), 
@@ -43,16 +44,13 @@ def compare(instance, nsim=50, q=0.2,
                 FDP = FD / max(TD + 1. * FD, 1.)
                 result.append((TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)))
 
-            if verbose:
-                print(method, len(result), tic-toc, len(selected), len(active))
-
             if i > 1:
                 df = pd.DataFrame([summary(r) for r in results], 
                                   index=[m.method_name for m in methods],
-                                  columns=['Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
+                                  columns=['Replicates', 'Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
 
                 if verbose:
-                    print(df['Full model power'])
+                    print(df[['Replicates', 'Full model power', 'Time']])
 
                 if htmlfile is not None:
                     f = open(htmlfile, 'w')

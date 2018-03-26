@@ -40,11 +40,11 @@ class equicor_instance(instance):
     @property
     def params(self):
         if not hasattr(self, 'rho'):
-            df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal]],
-                              columns=['name', 'n', 'p', 's', 'signal'])
+            df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal, self.signal_fac]],
+                              columns=['name', 'n', 'p', 's', 'signal', 'factor'])
         else:
-            df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal, self.rho]],
-                              columns=['name', 'n', 'p', 's', 'signal', 'rho'])
+            df = pd.DataFrame([[self.name, str(self.__class__), self.n, self.p, self.s, self.signal, self.signal_fac, self.rho]],
+                              columns=['name', 'class', 'n', 'p', 's', 'signal', 'factor', 'rho'])
         return df
 
     def generate(self):
@@ -97,8 +97,8 @@ class jelena_instance(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
-                          columns=['name', 'n', 'p', 's', 'signal'])
+        df = pd.DataFrame([[self.name, str(self.__class__), self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
+                          columns=['name', str(self.__class__), 'n', 'p', 's', 'signal'])
         return df
 
 jelena_instance.register()
@@ -129,8 +129,8 @@ class jelena_instance_flip(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
-                          columns=['name', 'n', 'p', 's', 'signal'])
+        df = pd.DataFrame([[self.name, str(self.__class__), self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
+                          columns=['name', 'class', 'n', 'p', 's', 'signal'])
         return df
 
 jelena_instance_flip.register()
@@ -161,8 +161,8 @@ class jelena_instance_flipmore(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
-                          columns=['name', 'n', 'p', 's', 'signal'])
+        df = pd.DataFrame([[self.name, str(self.__class__), self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
+                          columns=['name', 'class', 'n', 'p', 's', 'signal'])
         return df
 
 jelena_instance_flipmore.register()
@@ -194,8 +194,8 @@ class jelena_instance_AR(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.rho, self.signal * np.sqrt(self.n)]],
-                          columns=['name', 'n', 'p', 's', 'rho', 'signal'])
+        df = pd.DataFrame([[self.name, str(self.__class__), self.n, self.p, self.s, self.rho, self.signal * np.sqrt(self.n)]],
+                          columns=['name', 'class', 'n', 'p', 's', 'rho', 'signal'])
         return df
 
 jelena_instance_AR.register()
