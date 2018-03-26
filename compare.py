@@ -12,7 +12,7 @@ def compare(instance, nsim=50, q=0.2,
     
     results = [[] for m in methods]
     
-    runCV = np.any(['CV' in m.method_name for m in methods] + ['1se' in m.method_name for m in methods])
+    runCV = np.any(['CV' in str(m) for m in methods] + ['1se' in str(m) for m in methods])
 
     for i in range(nsim):
 
@@ -52,7 +52,7 @@ def compare(instance, nsim=50, q=0.2,
                                   columns=['Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
 
                 if verbose:
-                    print(df)
+                    print(df['Full model power'])
 
                 if htmlfile is not None:
                     f = open(htmlfile, 'w')
@@ -77,7 +77,7 @@ def main(opts):
     _methods = [methods[n] for n in opts.methods]
     _instance = instances[opts.instance]
 
-    if opts.instance in ['jelena_instance', 'jelena_instance_AR', 'jelena_instance_flip']:
+    if 'jelena' in opts.instance:
         instance = _instance()
     elif not opts.rho:
         instance = _instance(n=opts.nsample,

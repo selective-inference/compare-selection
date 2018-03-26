@@ -135,6 +135,38 @@ class jelena_instance_flip(instance):
 
 jelena_instance_flip.register()
 
+class jelena_instance_flipmore(instance):
+
+    name = 'Jelena, n=10000'
+    n = 10000
+    p = 2000
+    s = 30
+    signal = np.sqrt(2 * np.log(p) / n)
+
+    def generate(self):
+
+        n, p, s = self.n, self.p, self.s
+        X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=0., s=s)[0]
+        X /= np.sqrt((X**2).sum(0))[None, :] 
+
+        beta = np.zeros(p)
+        beta[:s] = self.signal
+        beta = randomize_signs(beta)
+        np.random.shuffle(beta)
+
+        X *= np.sqrt(n)
+        Y = X.dot(beta) + np.random.standard_normal(n)
+
+        return X, Y, beta
+
+    @property
+    def params(self):
+        df = pd.DataFrame([[self.name, self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
+                          columns=['name', 'n', 'p', 's', 'signal'])
+        return df
+
+jelena_instance_flipmore.register()
+
 class jelena_instance_AR(instance):
 
     name = 'Jelena AR(0.5)'
