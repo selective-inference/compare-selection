@@ -8,12 +8,12 @@ import regreg.api as rr
 
 import rpy2.robjects as rpy
 from rpy2.robjects import numpy2ri
-rpy.r('library(selectiveInference); library(knockoff)') # libraries we will use
+rpy.r('suppressMessages(library(selectiveInference)); suppressMessages(library(knockoff))') # R libraries we will use
 
 from selection.tests.instance import gaussian_instance
 
 def randomize_signs(beta):
-    return beta * np.random.binomial(1, 0.5, size=beta.shape)
+    return beta * (2 * np.random.binomial(1, 0.5, size=beta.shape) - 1)
 
 instances = {}
 
@@ -88,6 +88,7 @@ class jelena_instance(instance):
         beta = np.zeros(p)
         beta[:s] = self.signal
         beta = randomize_signs(beta)
+        np.random.shuffle(beta)
 
         X *= np.sqrt(n)
         Y = X.dot(beta) + np.random.standard_normal(n)
@@ -120,6 +121,7 @@ class jelena_instance_AR(instance):
         beta = np.zeros(p)
         beta[:s] = self.signal
         beta = randomize_signs(beta)
+        np.random.shuffle(beta)
 
         X *= np.sqrt(n)
         Y = X.dot(beta) + np.random.standard_normal(n)

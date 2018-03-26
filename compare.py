@@ -20,6 +20,7 @@ def compare(instance, nsim=50, q=0.2,
 
         def summary(result):
             result = np.atleast_2d(result)
+            print(result[:,0], len(true_active), 'power')
             return [np.mean(result[:,0]), 
                     np.std(result[:,0]) / np.sqrt(result.shape[0]), 
                     np.mean(result[:,1]), 
@@ -34,8 +35,9 @@ def compare(instance, nsim=50, q=0.2,
             M.q = q
             selected, active = M.select()
             tic = time.time()
-            if selected is not None:
+            if active is not None:
                 TD = len(true_active.intersection(selected))
+                print(TD, 'TD')
                 FD = len(selected) - TD
                 FDP = FD / max(TD + 1. * FD, 1.)
                 result.append((TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)))
