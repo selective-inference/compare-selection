@@ -216,8 +216,8 @@ def lagrange_vals(X, Y):
     L1 = rpy.r('L1')
     numpy2ri.deactivate()
     Xn = X / np.sqrt((X**2).sum(0))[None, :] 
-    l_theory = np.fabs(Xn.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p)
-    return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory
+    l_theory = np.fabs(Xn.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p) * np.std(Y)
+    return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory 
 
 
 def BHfilter(pval, q=0.2):
