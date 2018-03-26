@@ -1,0 +1,6 @@
+[submodule "selective-inference"]
+	path = selective-inference
+	url = https://github.com/jonathan-taylor/selective-inference.git
+[submodule "R-selective"]
+	path = R-selective
+	url = https://github.com/jonathan-taylor/R-selective.git

@@ -73,7 +73,8 @@ class knockoffs_orig(generic_method):
             rpy.r('if (length(V) > 0) {V = V-1}')
             V = rpy.r('V')
             numpy2ri.deactivate()
-            return np.asarray(V, np.int), np.asarray(V, np.int)
+            V = np.asarray(V, np.int)
+            return V, V
         except:
             return [], []
 
@@ -86,16 +87,16 @@ class knockoffs_fixed(generic_method):
     def select(self):
         try:
             numpy2ri.activate()
-            rpy.r.assign('X', X)
-            rpy.r.assign('Y', Y)
-            rpy.r.assign('q', q)
+            rpy.r.assign('X', self.X)
+            rpy.r.assign('Y', self.Y)
+            rpy.r.assign('q', self.q)
             rpy.r('V=knockoff.filter(X, Y, fdr=q, knockoffs=create.fixed)$selected')
             rpy.r('if (length(V) > 0) {V = V-1}')
             V = rpy.r('V')
             numpy2ri.deactivate()
             return np.asarray(V, np.int), np.asarray(V, np.int)
         except:
-            return None, []
+            return [], []
 
 knockoffs_fixed.register()
 
@@ -136,13 +137,13 @@ def truncation_interval(Qbeta_bar, Q, Qi_jj, j, beta_barj, lagrange):
 
 class liu_theory(generic_method):
 
-    method_name = "Liu (full)"            
+    method_name = "Liu + theory (full)"            
 
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
 
-        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1])
+        self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
         X, Y, lagrange = self.X, self.Y, self.lagrange
@@ -182,6 +183,18 @@ class liu_theory(generic_method):
 
 liu_theory.register()
 
+class liu_aggressive(liu_theory):
+
+    method_name = "Liu + theory, aggressive (full)"            
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+
+liu_aggressive.register()
+
 class liu_CV(liu_theory):
             
     method_name = "Liu + CV (full)" 
@@ -189,7 +202,7 @@ class liu_CV(liu_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_min * np.std(Y) * np.ones(X.shape[1])
+        self.lagrange = l_min * np.ones(X.shape[1])
 
 liu_CV.register()
 
@@ -200,7 +213,7 @@ class liu_1se(liu_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_1se * np.std(Y) * np.ones(X.shape[1])
+        self.lagrange = l_1se * np.ones(X.shape[1])
 
 liu_1se.register()
 
@@ -213,7 +226,7 @@ class lee_theory(generic_method):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1])
+        self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
 
@@ -283,7 +296,7 @@ class randomized_lasso(generic_method):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1])
+        self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
         X, Y, lagrange = self.X, self.Y, self.lagrange
@@ -342,7 +355,7 @@ class randomized_lasso_aggressive(randomized_lasso):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1]) * 0.8
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 class randomized_lasso_aggressive_half(randomized_lasso):
 
@@ -355,9 +368,22 @@ class randomized_lasso_aggressive_half(randomized_lasso):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1]) * 0.8
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
-randomized_lasso_aggressive.register(), randomized_lasso_aggressive_half.register()
+class randomized_lasso_aggressive_quarter(randomized_lasso):
+
+    method_name = "Randomized LASSO + theory, aggressive, smaller noise (selected)"
+
+    randomizer_scale = 0.25
+    ndraw = 5000
+    burnin = 1000
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+
+randomized_lasso_aggressive.register(), randomized_lasso_aggressive_half.register(), randomized_lasso_aggressive_quarter.register()
 
 # Randomized selected smaller randomization
 
@@ -453,7 +479,7 @@ class randomized_lasso_full(generic_method):
     def __init__(self, X, Y, l_theory, l_min, l_1se):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
-        self.lagrange = l_theory * np.std(Y) * np.ones(X.shape[1])
+        self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
         X, Y, lagrange = self.X, self.Y, self.lagrange
@@ -463,7 +489,7 @@ class randomized_lasso_full(generic_method):
         rand_lasso = highdim.gaussian(X,
                                       Y,
                                       lagrange,
-                                      randomizer_scale=self.randomizer_scale)
+                                      randomizer_scale=self.randomizer_scale * np.std(Y))
 
         signs = rand_lasso.fit()
         active_set = np.nonzero(signs)[0]
