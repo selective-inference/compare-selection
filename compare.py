@@ -6,6 +6,8 @@ import pandas as pd
 from utils import instances, lagrange_vals
 from methods import methods
 
+import knockoff_phenom # more instances
+
 def compare(instance, nsim=50, q=0.2,
             methods=[], verbose=False,
             htmlfile=None):
@@ -34,7 +36,7 @@ def compare(instance, nsim=50, q=0.2,
 
         for method, result in zip(methods, results):
             toc = time.time()
-            M = method(X, Y, l_theory, l_min, l_1se)
+            M = method(X, Y, l_theory, l_min, l_1se, instance.sigma)
             M.q = q
             selected, active = M.select()
             tic = time.time()
@@ -44,7 +46,7 @@ def compare(instance, nsim=50, q=0.2,
                 FDP = FD / max(TD + 1. * FD, 1.)
                 result.append((TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)))
 
-            if i > 1:
+            if i > 0:
                 df = pd.DataFrame([summary(r) for r in results], 
                                   index=[m.method_name for m in methods],
                                   columns=['Replicates', 'Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
@@ -75,19 +77,11 @@ def main(opts):
     _methods = [methods[n] for n in opts.methods]
     _instance = instances[opts.instance]
 
-    if 'jelena' in opts.instance:
+    if _instance.signature is None:
         instance = _instance()
-    elif not opts.rho:
-        instance = _instance(n=opts.nsample,
-                             p=opts.nfeature,
-                             s=opts.nsignal,
-                             signal_fac=opts.signal_fac)
     else:
-        instance = _instance(n=opts.nsample,
-                             p=opts.nfeature,
-                             s=opts.nsignal,
-                             signal_fac=opts.signal_fac,
-                             rho=rho)
+        print(dict([(n, getattr(opts, n)) for n in _instance.signature]))
+        instance = _instance(**dict([(n, getattr(opts, n)) for n in _instance.signature]))
 
     results = compare(instance,
                       nsim=opts.nsim,
@@ -114,14 +108,18 @@ Try:
     parser.add_argument('--list_methods',
                         dest='list_methods', action='store_true')
     parser.add_argument('--nsample', default=800, type=int,
+                        dest='n',
                         help='number of data points, n (default 800)')
     parser.add_argument('--nfeature', default=300, type=int,
+                        dest='p',
                         help='the number of features, p (default 300)')
     parser.add_argument('--nsignal', default=20, type=int,
+                        dest='s',
                         help='the number of nonzero coefs, s (default 20)')
     parser.add_argument('--signal_fac', default=1.2, type=float,
                         help='Scale applied to theoretical lambda to get signal size.')
     parser.add_argument('--rho', type=float,
+                        default=0.5,
                         dest='rho',
                         help='Value of AR(1), equicor or mixed param.')
     parser.add_argument('--q', default=0.2, type=float,

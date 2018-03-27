@@ -22,16 +22,18 @@ class generic_method(object):
     q = 0.2
     method_name = 'Generic method'
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
         (self.X,
          self.Y,
          self.l_theory,
          self.l_min,
-         self.l_1se) = (X,
+         self.l_1se,
+         self.sigma) = (X,
                         Y,
                         l_theory,
                         l_min,
-                        l_1se)
+                        l_1se,
+                        sigma)
 
     def select(self):
         raise NotImplementedError('abstract method')
@@ -139,9 +141,9 @@ class liu_theory(generic_method):
 
     method_name = "Liu + theory (full)"            
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma=sigma)
 
         self.lagrange = l_theory * np.ones(X.shape[1])
 
@@ -187,9 +189,9 @@ class liu_aggressive(liu_theory):
 
     method_name = "Liu + theory, aggressive (full)"            
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
 
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
@@ -199,9 +201,9 @@ class liu_CV(liu_theory):
             
     method_name = "Liu + CV (full)" 
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_min * np.ones(X.shape[1])
 
 liu_CV.register()
@@ -210,9 +212,9 @@ class liu_1se(liu_theory):
             
     method_name = "Liu + 1SE (full)" 
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
 liu_1se.register()
@@ -223,9 +225,9 @@ class lee_theory(generic_method):
     
     method_name = "Lee et al. + theory (selected)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
@@ -254,9 +256,9 @@ class lee_CV(lee_theory):
     
     method_name = "Lee et al. + CV (selected)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_min * np.ones(X.shape[1])
 
 lee_CV.register()
@@ -265,9 +267,9 @@ class lee_1se(lee_theory):
     
     method_name = "Lee et al. + 1SE (selected)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
 lee_1se.register()
@@ -276,9 +278,9 @@ class lee_aggressive(lee_theory):
     
     method_name = "Lee et al. + theory, aggressive (selected)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = 0.8 * l_theory * np.ones(X.shape[1])
 
 lee_aggressive.register()
@@ -293,9 +295,9 @@ class randomized_lasso(generic_method):
     ndraw = 5000
     burnin = 1000
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
@@ -326,18 +328,18 @@ class randomized_lasso_CV(randomized_lasso):
 
     method_name = "Randomized LASSO + CV (selected)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_min * np.ones(X.shape[1])
 
 class randomized_lasso_1se(randomized_lasso):
 
     method_name = "Randomized LASSO + 1SE (selected)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
 randomized_lasso.register(), randomized_lasso_CV.register(), randomized_lasso_1se.register()
@@ -352,9 +354,9 @@ class randomized_lasso_aggressive(randomized_lasso):
     ndraw = 5000
     burnin = 1000
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 class randomized_lasso_aggressive_half(randomized_lasso):
@@ -365,9 +367,9 @@ class randomized_lasso_aggressive_half(randomized_lasso):
     ndraw = 5000
     burnin = 1000
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 class randomized_lasso_aggressive_quarter(randomized_lasso):
@@ -378,9 +380,9 @@ class randomized_lasso_aggressive_quarter(randomized_lasso):
     ndraw = 5000
     burnin = 1000
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 randomized_lasso_aggressive.register(), randomized_lasso_aggressive_half.register(), randomized_lasso_aggressive_quarter.register()
@@ -476,9 +478,9 @@ class randomized_lasso_full(generic_method):
     ndraw = 5000
     burnin = 1000
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
@@ -514,18 +516,18 @@ class randomized_lasso_full_CV(randomized_lasso_full):
 
     method_name = "Randomized LASSO + CV (full)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_min * np.ones(X.shape[1])
 
 class randomized_lasso_full_1se(randomized_lasso_full):
 
     method_name = "Randomized LASSO + 1SE (full)"
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se):
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
 randomized_lasso_full.register(), randomized_lasso_full_CV.register(), randomized_lasso_full_1se.register(), randomized_lasso_full_half.register() 
