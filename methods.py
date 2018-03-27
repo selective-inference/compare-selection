@@ -15,8 +15,6 @@ from rpy2.robjects import numpy2ri
 
 methods = {}
 
-# Knockoff selection
-
 class generic_method(object):
 
     q = 0.2
@@ -42,6 +40,8 @@ class generic_method(object):
     def register(cls):
         methods[cls.__name__] = cls
 
+# Knockoff selection
+
 class knockoffs_mf(generic_method):
 
     method_name = 'ModelX Knockoffs  (full)'
@@ -61,6 +61,37 @@ class knockoffs_mf(generic_method):
             return [], []
 
 knockoffs_mf.register()
+
+class knockoffs_sigma(generic_method):
+
+    method_name = 'ModelX Knockoffs with Sigma (full)'
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
+        numpy2ri.activate()
+        rpy.r.assign('X', self.X)
+        rpy.r.assign('Sigma', self.sigma)
+        rpy.r('''knockoffs = function(X) {
+             return(create.gaussian(X, rep(0, ncol(X)), Sigma))
+             }
+        ''')
+        numpy2ri.deactivate()
+
+    def select(self):
+        try:
+            numpy2ri.activate()
+            rpy.r.assign('X', self.X)
+            rpy.r.assign('Y', self.Y)
+            rpy.r.assign('q', self.q)
+            rpy.r('V=knockoff.filter(X, Y, fdr=q, knockoffs=knockoffs)$selected')
+            rpy.r('if (length(V) > 0) {V = V-1}')
+            V = rpy.r('V')
+            numpy2ri.deactivate()
+            return np.asarray(V, np.int), np.asarray(V, np.int)
+        except:
+            return [], []
+
+knockoffs_sigma.register()
 
 class knockoffs_orig(generic_method):
     method_name = 'Candes & Barber (full)'
