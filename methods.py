@@ -1,8 +1,7 @@
 import numpy as np
 import regreg.api as rr
 
-from selection.truncated.gaussian import truncated_gaussian_old as TG
-from selection.algorithms.lasso import lasso
+from selection.algorithms.lasso import lasso, lasso_full
 from selection.algorithms.sqrt_lasso import choose_lambda
 from selection.randomized.lasso import highdim
 
@@ -160,13 +159,12 @@ class knockoffs_fixed(generic_method):
 knockoffs_fixed.register()
 
 # Liu, Markovic, Tibs selection
-# put this into library!
 
 def solve_problem(Qbeta_bar, Q, lagrange, initial=None):
     p = Qbeta_bar.shape[0]
     loss = rr.quadratic_loss((p,), Q=Q, quadratic=rr.identity_quadratic(0, 
                                                                         0, 
-                                                                        -Qbeta_bar, 
+                                                                        Qbeta_bar, 
                                                                         0))
     lagrange = np.asarray(lagrange)
     if lagrange.shape in [(), (1,)]:
@@ -175,7 +173,7 @@ def solve_problem(Qbeta_bar, Q, lagrange, initial=None):
     problem = rr.simple_problem(loss, pen)
     if initial is not None:
         problem.coefs[:] = initial
-    soln = problem.solve(tol=1.e-12, min_its=10)
+    soln = problem.solve(tol=1.e12, min_its=10)
     return soln
 
 def truncation_interval(Qbeta_bar, Q, Qi_jj, j, beta_barj, lagrange):
@@ -186,11 +184,11 @@ def truncation_interval(Qbeta_bar, Q, Qi_jj, j, beta_barj, lagrange):
 
     p = Qbeta_bar.shape[0]
     I = np.identity(p)
-    nuisance = Qbeta_bar - I[:,j] / Qi_jj * beta_barj
+    nuisance = Qbeta_bar  I[:,j] / Qi_jj * beta_barj
     
-    center = nuisance[j] - Q[j].dot(restricted_soln)
-    upper = (lagrange[j] - center) * Qi_jj
-    lower = (-lagrange[j] - center) * Qi_jj
+    center = nuisance[j]  Q[j].dot(restricted_soln)
+    upper = (lagrange[j]  center) * Qi_jj
+    lower = (lagrange[j]  center) * Qi_jj
 
     return lower, upper
 
@@ -201,14 +199,14 @@ class liu_theory(generic_method):
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma=sigma)
-
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     def select(self):
+
         X, Y, lagrange = self.X, self.Y, self.lagrange
         n, p = X.shape
         X = X / np.sqrt(n)
-
+ 
         Q = X.T.dot(X)
         Qi = np.linalg.inv(Q)
 
@@ -216,7 +214,7 @@ class liu_theory(generic_method):
 
         Qbeta_bar = X.T.dot(Y)
         beta_bar = np.linalg.pinv(X).dot(Y)
-        sigma = np.linalg.norm(Y - X.dot(beta_bar)) / np.sqrt(n - p)
+        sigma = np.linalg.norm(Y  X.dot(beta_bar)) / np.sqrt(n  p)
 
         soln = solve_problem(Qbeta_bar, Q, lagrange)
         active_set = E = np.nonzero(soln)[0]
@@ -228,19 +226,48 @@ class liu_theory(generic_method):
             lower, upper =  truncation_interval(Qbeta_bar, Q, QiE[j,j], idx, beta_barE[j], lagrange)
             if not (beta_barE[j] < lower or beta_barE[j] > upper):
                 print("Liu constraint not satisfied")
-            tg = TG([(-np.inf, lower), (upper, np.inf)], scale=sigma*np.sqrt(QiE[j,j]))
+            tg = TG([(np.inf, lower), (upper, np.inf)], scale=sigma*np.sqrt(QiE[j,j]))
             pvalue = tg.cdf(beta_barE[j])
-            pvalue = float(2 * min(pvalue, 1 - pvalue))
+            pvalue = float(2 * min(pvalue, 1  pvalue))
             pvalues.append(pvalue)
 
         if len(pvalues) > 0:
             selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
         else:
             selected = []
+        return selected, active_set
+liu_theory.register()
 
+class liu_theory_new(generic_method):
+
+    method_name = "Liu + theory (full)"            
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma=sigma)
+        self.lagrange = l_theory * np.ones(X.shape[1])
+
+    def select(self):
+
+        X, Y, lagrange = self.X, self.Y, self.lagrange
+        n, p = X.shape
+        X = X / np.sqrt(n)
+        L = lasso_full.gaussian(X, Y, lagrange)
+        L.fit()
+        if len(L.active) > 0:
+            S = L.summary(compute_intervals=False)
+            active_set = np.array(S['variable'])
+            pvalues = np.asarray(S['pval'])
+
+            if len(pvalues) > 0:
+                selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            else:
+                selected = []
+        else:
+            selected, active_set = [], []
         return selected, active_set
 
-liu_theory.register()
+liu_theory_new.register()
 
 class liu_aggressive(liu_theory):
 
