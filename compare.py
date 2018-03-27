@@ -16,6 +16,9 @@ def compare(instance, nsim=50, q=0.2,
     
     runCV = np.any(['CV' in str(m) for m in methods] + ['1se' in str(m) for m in methods])
 
+    for method in methods:
+        method.setup(instance.sigma)
+
     for i in range(nsim):
 
         X, Y, beta = instance.generate()

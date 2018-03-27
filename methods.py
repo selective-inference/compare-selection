@@ -20,6 +20,10 @@ class generic_method(object):
     q = 0.2
     method_name = 'Generic method'
 
+    @classmethod
+    def setup(cls, sigma):
+        pass
+
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
         (self.X,
          self.Y,
@@ -66,14 +70,36 @@ class knockoffs_sigma(generic_method):
 
     method_name = 'ModelX Knockoffs with Sigma (full)'
 
-    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
+    @classmethod
+    def setup(cls, sigma):
+
         numpy2ri.activate()
-        rpy.r.assign('X', self.X)
-        rpy.r.assign('Sigma', self.sigma)
-        rpy.r('''knockoffs = function(X) {
-             return(create.gaussian(X, rep(0, ncol(X)), Sigma))
-             }
+        rpy.r.assign('Sigma', sigma)
+        rpy.r('''
+
+    # Compute the Cholesky -- from create.gaussian
+
+    method = 'asdp'
+
+    if ((nrow(Sigma) <= 500) && method == "asdp") {
+        method = "sdp"
+    }
+    diag_s = create.solve_asdp(Sigma)
+    if (is.null(dim(diag_s))) {
+        diag_s = diag(diag_s, length(diag_s))
+    }
+    SigmaInv_s = solve(Sigma, diag_s)
+    Sigma_k = 2 * diag_s - diag_s %*% SigmaInv_s
+    chol_k = chol(Sigma_k)
+
+    knockoffs = function(X) {
+       mu = rep(0, ncol(X))
+       mu_k = X # sweep(X, 2, mu, "-") %*% SigmaInv_s
+       Sigma_k = 2 * diag_s - diag_s %*% SigmaInv_s
+       X_k = mu_k + matrix(rnorm(ncol(X) * nrow(X)), nrow(X)) %*% 
+        chol_k
+       return(X_k)
+    }
         ''')
         numpy2ri.deactivate()
 

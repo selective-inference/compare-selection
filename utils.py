@@ -195,7 +195,7 @@ class jelena_instance_AR(instance):
     @property
     def sigma(self):
         if not hasattr(self, "_sigma"):
-            self._sigma = self.rho**(-np.fabs(np.subtract.outer(np.arange(p), np.arange(p))))
+            self._sigma = self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p)))
         return self._sigma
 
 jelena_instance_AR.register()
@@ -236,7 +236,7 @@ class mixed_instance(equicor_instance):
     @property
     def sigma(self):
         if not hasattr(self, "_sigma"):
-            self._sigma = 0.5 * (self.rho**(-np.fabs(np.subtract.outer(np.arange(p), np.arange(p)))) + 
+            self._sigma = 0.5 * (self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p))) + 
                                  np.ones((self.p, self.p)) * self.equicor_rho + (1 - self.equicor_rho) * np.identity(self.p))
         return self._sigma
 
@@ -282,7 +282,7 @@ class AR_instance(equicor_instance):
     @property
     def sigma(self):
         if not hasattr(self, "_sigma"):
-            self._sigma = self.rho**(-np.fabs(np.subtract.outer(np.arange(p), np.arange(p))))
+            self._sigma = self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p)))
         return self._sigma
 
 
