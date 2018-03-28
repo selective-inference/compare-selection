@@ -184,11 +184,11 @@ def truncation_interval(Qbeta_bar, Q, Qi_jj, j, beta_barj, lagrange):
 
     p = Qbeta_bar.shape[0]
     I = np.identity(p)
-    nuisance = Qbeta_bar  I[:,j] / Qi_jj * beta_barj
+    nuisance = Qbeta_bar - I[:,j] / Qi_jj * beta_barj
     
-    center = nuisance[j]  Q[j].dot(restricted_soln)
-    upper = (lagrange[j]  center) * Qi_jj
-    lower = (lagrange[j]  center) * Qi_jj
+    center = nuisance[j] - Q[j].dot(restricted_soln)
+    upper = (lagrange[j] - center) * Qi_jj
+    lower = (lagrange[j] - center) * Qi_jj
 
     return lower, upper
 
@@ -214,7 +214,7 @@ class liu_theory(generic_method):
 
         Qbeta_bar = X.T.dot(Y)
         beta_bar = np.linalg.pinv(X).dot(Y)
-        sigma = np.linalg.norm(Y  X.dot(beta_bar)) / np.sqrt(n  p)
+        sigma = np.linalg.norm(Y - X.dot(beta_bar)) / np.sqrt(n - p)
 
         soln = solve_problem(Qbeta_bar, Q, lagrange)
         active_set = E = np.nonzero(soln)[0]
@@ -228,7 +228,7 @@ class liu_theory(generic_method):
                 print("Liu constraint not satisfied")
             tg = TG([(np.inf, lower), (upper, np.inf)], scale=sigma*np.sqrt(QiE[j,j]))
             pvalue = tg.cdf(beta_barE[j])
-            pvalue = float(2 * min(pvalue, 1  pvalue))
+            pvalue = float(2 * min(pvalue, 1 - pvalue))
             pvalues.append(pvalue)
 
         if len(pvalues) > 0:
@@ -590,12 +590,6 @@ class randomized_lasso_full(generic_method):
 
         return selected, active_set
 
-class randomized_lasso_full_half(randomized_lasso_full):
-
-    method_name = "Randomized LASSO + theory, smaller noise (full)"
-
-    randomizer_scale = 0.5
-
 class randomized_lasso_full_CV(randomized_lasso_full):
 
     method_name = "Randomized LASSO + CV (full)"
@@ -614,4 +608,48 @@ class randomized_lasso_full_1se(randomized_lasso_full):
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
-randomized_lasso_full.register(), randomized_lasso_full_CV.register(), randomized_lasso_full_1se.register(), randomized_lasso_full_half.register() 
+randomized_lasso_full.register(), randomized_lasso_full_CV.register(), randomized_lasso_full_1se.register()
+
+# Randomized full smaller randomization
+
+class randomized_lasso_full_half(randomized_lasso_full):
+
+    method_name = "Randomized LASSO + theory, smaller noise (full)"
+    randomizer_scale = 0.5
+
+class randomized_lasso_full_half_CV(randomized_lasso_full_CV):
+
+    method_name = "Randomized LASSO + CV, smaller noise (full)"
+    randomizer_scale = 0.5
+    pass
+
+class randomized_lasso_full_half_1se(randomized_lasso_full_1se):
+
+    method_name = "Randomized LASSO + 1SE, smaller noise (full)"
+    randomizer_scale = 0.5
+    pass
+
+randomized_lasso_full_half.register(), randomized_lasso_full_half_CV.register(), randomized_lasso_full_half_1se.register()
+
+# Aggressive choice of lambda
+
+class randomized_lasso_full_aggressive(randomized_lasso_full):
+
+    method_name = "Randomized LASSO + theory, aggressive, smaller noise (full)"
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+
+class randomized_lasso_full_aggressive_half(randomized_lasso_full_aggressive):
+
+    method_name = "Randomized LASSO + theory, aggressive, smaller noise (full)"
+    randomizer_scale = 0.5
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma)
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+
+randomized_lasso_full_aggressive.register(), randomized_lasso_full_aggressive_half.register()

@@ -1,0 +1,17 @@
+python compare.py --instance mixed_instance --nsample 1000 --nfeature 2000 
+    --nsignal 30 --methods knockoffs_sigma randomized_lasso_half 
+    randomized_lasso_aggressive_half randomized_lasso_half_1se 
+    randomized_lasso_full_half randomized_lasso_full_aggressive_half 
+    randomized_lasso_full_half_1se lee_theory lee_aggressive 
+    lee_1se lee_CV  --verbose --htmlfile simresults/mixed_n1000_p2000.html
+     --signal 3.5 4 4.5 5 --nsim 100 
+     --csvfile simresults/mixed_n1000_p2000.csv --rho 0. 0.25 0.5 0.75
+
+python compare.py --instance AR_instance --nsample 1000 --nfeature 2000 
+    --nsignal 30 --methods knockoffs_sigma randomized_lasso_half 
+    randomized_lasso_aggressive_half randomized_lasso_half_1se 
+    randomized_lasso_full_half randomized_lasso_full_aggressive_half 
+    randomized_lasso_full_half_1se lee_theory lee_aggressive 
+    lee_1se lee_CV  --verbose --htmlfile simresults/AR_n1000_p2000.html
+     --signal 3.5 4 4.5 5 --nsim 100 
+     --csvfile simresults/AR_n1000_p2000.csv --rho 0. 0.25 0.5 0.75

@@ -28,13 +28,29 @@ class instance(object):
     def register(cls):
         instances[cls.__name__] = cls
 
+class equicor_instance(instance):
+
+    name = 'Exchangeable'
+    signature = ('n', 'p', 's', 'rho')
+    signal_fac = 1.5 # used in set_l_theory to set signal strength
+                     # as a multiple of l_theory
+
+    def __init__(self, n=500, p=200, s=20, rho=0.5):
+
+        (self.n,
+         self.p,
+         self.s,
+         self.rho) = (n, p, s, rho)
+
+        self.set_l_theory()
+
     def set_l_theory(self, factor=3):
         """
         Used for setting lambda for a signal size
         """
         nf = 0
         X = []
-
+        self.signal = 0. # will be overwritten below but needed to generate
         self.fixed_l_theory = 0
         while True:
             X.append(self.generate()[0])
@@ -49,18 +65,7 @@ class instance(object):
 
         self.fixed_l_theory = np.fabs(X.T.dot(np.random.standard_normal((nf, 500)))).max(1).mean()
 
-class equicor_instance(instance):
-
-    name = 'Exchangeable'
-    signature = ('n', 'p', 's', 'rho', 'signal_fac')
-
-    def __init__(self, n=500, p=200, s=20, rho=0.5, signal_fac=1.5):
-        (self.n,
-         self.p,
-         self.s,
-         self.rho, 
-         self.signal_fac) = (n, p, s, rho, signal_fac)
-        self.set_l_theory()
+        self.signal = self.signal_fac * self.fixed_l_theory
 
     @property
     def sigma(self):
@@ -76,18 +81,16 @@ class equicor_instance(instance):
 
     def generate(self):
 
-        (n, p, s, rho, signal_fac) = (self.n,
-                                      self.p,
-                                      self.s,
-                                      self.rho, 
-                                      self.signal_fac)
+        (n, p, s, rho) = (self.n,
+                          self.p,
+                          self.s,
+                          self.rho)
 
         X = gaussian_instance(n=n, p=p, equicorrelated=True, rho=rho, s=s)[0]
         X /= np.sqrt((X**2).sum(0))[None, :] 
 
         beta = np.zeros(p)
 
-        self.signal = signal_fac * self.fixed_l_theory
         beta[:s] = self.signal
         beta = randomize_signs(beta)
 
@@ -200,29 +203,61 @@ class jelena_instance_AR(instance):
 
 jelena_instance_AR.register()
 
+class jelena_instance_AR75(jelena_instance_AR):
+
+    name = 'Jelena AR(0.75)'
+    rho = 0.75
+
+jelena_instance_AR75.register()
+
 class mixed_instance(equicor_instance):
 
-    signature = ('n', 'p', 's', 'rho', 'signal_fac')
+    signature = ('n', 'p', 's', 'rho', 'equicor_rho', 'AR_weight')
     name = 'Mixed'
-    equicor_rho = 0.25
+
+    def __init__(self, 
+                 n=500, 
+                 p=200, 
+                 s=20, 
+                 rho=0.5, 
+                 equicor_rho=0.25,
+                 AR_weight=0.5):
+
+        (self.n,
+         self.p,
+         self.s,
+         self.rho,
+         self.equicor_rho,
+         self.AR_weight) = (n, 
+                            p, 
+                            s, 
+                            rho,
+                            equicor_rho,
+                            AR_weight)
+
+        self.set_l_theory()
 
     def generate(self):
 
-        (n, p, s, rho, signal_fac) = (self.n,
-                                      self.p,
-                                      self.s,
-                                      self.rho, 
-                                      self.signal_fac)
+        (n, p, s, rho) = (self.n,
+                          self.p,
+                          self.s,
+                          self.rho)
 
-        X0 = gaussian_instance(n=n, p=p, equicorrelated=True, rho=self.equicor_rho)[0]
-        X1 = gaussian_instance(n=n, p=p, equicorrelated=False, rho=rho)[0]
+        X_equi = gaussian_instance(n=n, 
+                                   p=p, 
+                                   equicorrelated=True, 
+                                   rho=self.equicor_rho)[0]
+        X_AR = gaussian_instance(n=n, 
+                                 p=p, 
+                                 equicorrelated=False, 
+                                 rho=rho)[0]
 
-        X = X0 + X1
+        X = np.sqrt(self.AR_weight) * X_AR + np.sqrt(1 - self.AR_weight) * X_equi
         X /= np.sqrt((X**2).sum(0))[None, :] 
 
         beta = np.zeros(p)
 
-        self.signal = signal_fac * np.max(self.fixed_l_theory)
         beta[:s] = self.signal
         np.random.shuffle(beta)
         beta = randomize_signs(beta)
@@ -244,31 +279,29 @@ mixed_instance.register()
 
 class indep_instance(equicor_instance):
 
-    signature = ('n', 'p', 's', 'signal_fac')
+    signature = ('n', 'p', 's')
     name = 'Independent'
 
-    def __init__(self, n=500, p=200, s=20, signal_fac=1.5):
+    def __init__(self, n=500, p=200, s=20):
         equicor_instance.__init__(self,
                                   n=n,
                                   p=p,
                                   s=s,
-                                  signal_fac=signal_fac,
                                   rho=0.)
 
 indep_instance.register()
 
 class AR_instance(equicor_instance):
 
-    signature = ('n', 'p', 's', 'rho', 'signal_fac')
+    signature = ('n', 'p', 's', 'rho')
     name = 'AR'
 
     def generate(self):
 
-        n, p, s, rho, signal_fac = self.n, self.p, self.s, self.rho, self.signal_fac
+        n, p, s, rho = self.n, self.p, self.s, self.rho
         X = gaussian_instance(n=n, p=p, equicorrelated=False, rho=rho)[0]
 
         beta = np.zeros(p)
-        self.signal = signal_fac * np.max(self.fixed_l_theory)
         beta[:s] = self.signal
         np.random.shuffle(beta)
         beta = randomize_signs(beta)
@@ -288,14 +321,14 @@ class AR_instance(equicor_instance):
 
 AR_instance.register()
 
-def lagrange_vals(X, Y, runCV=True):
+def lagrange_vals(X, Y, run_CV=True):
     n, p = X.shape
 
     Xn = X / np.sqrt((X**2).sum(0))[None, :] 
 
     l_theory = np.fabs(Xn.T.dot(np.random.standard_normal((n, 500)))).max(1).mean() * np.ones(p) * np.std(Y)
 
-    if runCV:
+    if run_CV:
         numpy2ri.activate()
         rpy.r.assign('X', X)
         rpy.r.assign('Y', Y)
