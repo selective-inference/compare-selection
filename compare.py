@@ -131,11 +131,12 @@ def main(opts, clean=True):
                           htmlfile=new_opts.htmlfile,
                           method_setup=method_setup)
 
-        f = open(new_opts.csvfile, 'w')
-        f.write(results.to_csv() + '\n')
-        f.close()
-
         if opts.csvfile is not None:
+
+            f = open(new_opts.csvfile, 'w')
+            f.write(results.to_csv() + '\n')
+            f.close()
+
             csvfiles = glob(opts.csvfile + '_signal*')
             dfs = [pd.read_csv(f) for f in csvfiles]
             df = pd.concat(dfs)

@@ -3,6 +3,7 @@ import regreg.api as rr
 
 from selection.algorithms.lasso import lasso, lasso_full
 from selection.algorithms.sqrt_lasso import choose_lambda
+from selection.truncated.gaussian import truncated_gaussian_old as TG
 from selection.randomized.lasso import highdim
 
 from utils import BHfilter
@@ -164,7 +165,7 @@ def solve_problem(Qbeta_bar, Q, lagrange, initial=None):
     p = Qbeta_bar.shape[0]
     loss = rr.quadratic_loss((p,), Q=Q, quadratic=rr.identity_quadratic(0, 
                                                                         0, 
-                                                                        Qbeta_bar, 
+                                                                        -Qbeta_bar, 
                                                                         0))
     lagrange = np.asarray(lagrange)
     if lagrange.shape in [(), (1,)]:
