@@ -216,7 +216,7 @@ class liu_theory(generic_method):
         Qbeta_bar = X.T.dot(Y)
         beta_bar = np.linalg.pinv(X).dot(Y)
         sigma = np.linalg.norm(Y - X.dot(beta_bar)) / np.sqrt(n - p)
-
+        print(sigma, 'sigmaold')
         soln = solve_problem(Qbeta_bar, Q, lagrange)
         active_set = E = np.nonzero(soln)[0]
 
@@ -227,7 +227,8 @@ class liu_theory(generic_method):
             lower, upper =  truncation_interval(Qbeta_bar, Q, QiE[j,j], idx, beta_barE[j], lagrange)
             if not (beta_barE[j] < lower or beta_barE[j] > upper):
                 print("Liu constraint not satisfied")
-            tg = TG([(np.inf, lower), (upper, np.inf)], scale=sigma*np.sqrt(QiE[j,j]))
+            print(sigma*np.sqrt(QiE[j,j]), 'sdold', j)
+            tg = TG([(-np.inf, lower), (upper, np.inf)], scale=sigma*np.sqrt(QiE[j,j]))
             pvalue = tg.cdf(beta_barE[j])
             pvalue = float(2 * min(pvalue, 1 - pvalue))
             pvalues.append(pvalue)
