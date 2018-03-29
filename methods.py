@@ -186,10 +186,10 @@ def truncation_interval(Qbeta_bar, Q, Qi_jj, j, beta_barj, lagrange):
     p = Qbeta_bar.shape[0]
     I = np.identity(p)
     nuisance = Qbeta_bar - I[:,j] / Qi_jj * beta_barj
-    
+
     center = nuisance[j] - Q[j].dot(restricted_soln)
-    upper = (lagrange[j] + center) * Qi_jj
-    lower = (-lagrange[j] + center) * Qi_jj
+    upper = (lagrange[j] - center) * Qi_jj
+    lower = (-lagrange[j] - center) * Qi_jj
 
     return lower, upper
 
