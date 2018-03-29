@@ -161,86 +161,7 @@ knockoffs_fixed.register()
 
 # Liu, Markovic, Tibs selection
 
-def solve_problem(Qbeta_bar, Q, lagrange, initial=None):
-    p = Qbeta_bar.shape[0]
-    loss = rr.quadratic_loss((p,), Q=Q, quadratic=rr.identity_quadratic(0, 
-                                                                        0, 
-                                                                        -Qbeta_bar, 
-                                                                        0))
-    lagrange = np.asarray(lagrange)
-    if lagrange.shape in [(), (1,)]:
-        lagrange = np.ones(p) * lagrange
-    pen = rr.weighted_l1norm(lagrange, lagrange=1.)
-    problem = rr.simple_problem(loss, pen)
-    if initial is not None:
-        problem.coefs[:] = initial
-    soln = problem.solve(tol=1.e12, min_its=10)
-    return soln
-
-def truncation_interval(Qbeta_bar, Q, Qi_jj, j, beta_barj, lagrange):
-    if lagrange[j] != 0:
-        lagrange_cp = lagrange.copy()
-    lagrange_cp[j] = np.inf
-    restricted_soln = solve_problem(Qbeta_bar, Q, lagrange_cp)
-
-    p = Qbeta_bar.shape[0]
-    I = np.identity(p)
-    nuisance = Qbeta_bar - I[:,j] / Qi_jj * beta_barj
-
-    center = nuisance[j] - Q[j].dot(restricted_soln)
-    upper = (lagrange[j] - center) * Qi_jj
-    lower = (-lagrange[j] - center) * Qi_jj
-
-    return lower, upper
-
 class liu_theory(generic_method):
-
-    method_name = "Liu + theory (full)"            
-
-    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma):
-
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma=sigma)
-        self.lagrange = l_theory * np.ones(X.shape[1])
-
-    def select(self):
-
-        X, Y, lagrange = self.X, self.Y, self.lagrange
-        n, p = X.shape
-        X = X / np.sqrt(n)
- 
-        Q = X.T.dot(X)
-        Qi = np.linalg.inv(Q)
-
-        pvalues = []
-
-        Qbeta_bar = X.T.dot(Y)
-        beta_bar = np.linalg.pinv(X).dot(Y)
-        sigma = np.linalg.norm(Y - X.dot(beta_bar)) / np.sqrt(n - p)
-        print(sigma, 'sigmaold')
-        soln = solve_problem(Qbeta_bar, Q, lagrange)
-        active_set = E = np.nonzero(soln)[0]
-
-        QiE = Qi[E][:,E]
-        beta_barE = beta_bar[E]
-        for j in range(len(active_set)):
-            idx = active_set[j]
-            lower, upper =  truncation_interval(Qbeta_bar, Q, QiE[j,j], idx, beta_barE[j], lagrange)
-            if not (beta_barE[j] < lower or beta_barE[j] > upper):
-                print("Liu constraint not satisfied")
-            print(sigma*np.sqrt(QiE[j,j]), 'sdold', j)
-            tg = TG([(-np.inf, lower), (upper, np.inf)], scale=sigma*np.sqrt(QiE[j,j]))
-            pvalue = tg.cdf(beta_barE[j])
-            pvalue = float(2 * min(pvalue, 1 - pvalue))
-            pvalues.append(pvalue)
-
-        if len(pvalues) > 0:
-            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
-        else:
-            selected = []
-        return selected, active_set
-liu_theory.register()
-
-class liu_theory_new(generic_method):
 
     method_name = "Liu + theory (full)"            
 
@@ -269,7 +190,7 @@ class liu_theory_new(generic_method):
             selected, active_set = [], []
         return selected, active_set
 
-liu_theory_new.register()
+liu_theory.register()
 
 class liu_aggressive(liu_theory):
 
