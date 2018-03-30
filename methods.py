@@ -88,11 +88,9 @@ class knockoffs_sigma(generic_method):
                 np.allclose(sigma_f, sigma)):
                 have_factorization = True
                 cls.knockoff_chol = factor['knockoff_chol']
-                cls.SigmaInv_s = factor['SigmaInv_s']
-                cls.diag_s = factor['diag_s']
 
         if not have_factorization:
-            cls.knockoff_chol, cls.SigmaInv_s, cls.diag_s = factor_knockoffs(sigma, cls.factor_method)
+            cls.knockoff_chol = factor_knockoffs(sigma, cls.factor_method)
 
         numpy2ri.deactivate()
 
@@ -100,8 +98,6 @@ class knockoffs_sigma(generic_method):
 
         numpy2ri.activate()
         rpy.r.assign('chol_k', self.knockoff_chol)
-        rpy.r.assign('SigmaInv_s', self.SigmaInv_s)
-        rpy.r.assign('diag_s', self.diag_s)
         rpy.r('''
         knockoffs = function(X) {
            mu = rep(0, ncol(X))
@@ -156,7 +152,7 @@ def factor_knockoffs(sigma, method='asdp'):
              SigmaInv_s=SigmaInv_s,
              knockoff_chol=knockoff_chol)
 
-    return knockoff_chol, SigmaInv_s, diag_s
+    return knockoff_chol
 
 class knockoffs_sigma_equi(knockoffs_sigma):
 
