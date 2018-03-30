@@ -3,6 +3,7 @@ import numpy as np
 import pandas as pd
 
 methods = ['ModelX Knockoffs with Sigma (full)',
+           'ModelX Knockoffs with Sigma, equi, (full)',
            'Randomized LASSO + 1SE, smaller noise (selected)',
            'Randomized LASSO + 1SE, smaller noise (full)',
            'Lee et al. + theory, aggressive (selected)']
