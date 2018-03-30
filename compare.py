@@ -154,7 +154,7 @@ def main(opts, clean=False):
             df = pd.concat(dfs)
             df.to_csv(opts.csvfile, index=False)
 
-    if clean:
+    if opts.clean:
         [os.remove(f) for f in csvfiles]
 
 if __name__ == "__main__":
@@ -201,10 +201,12 @@ Try:
                         help='How many repetitions?')
     parser.add_argument('--verbose', action='store_true',
                         dest='verbose')
-    parser.add_argument('--htmlfile', help='HTML file to store results for one (signal, rho).',
+    parser.add_argument('--htmlfile', help='HTML file to store results for one (signal, rho). When looping over (signal, rho) this HTML file tracks the current progress.',
                         dest='htmlfile')
     parser.add_argument('--csvfile', help='CSV file to store results looped over (signal, rho).',
                         dest='csvfile')
+    parser.add_argument('--clean', help='Remove individual CSV files after termination?',
+                        default=False)
 
     opts = parser.parse_args()
 

@@ -20,11 +20,11 @@ Testing
 
 If installed correctly, the following should give you some results for a small problem:
 
-python compare.py --instance indep_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile indep.html
+python compare.py --instance AR_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile AR.html --csvfile AR.csv
 
 For a grid of signal and / or AR(1) parameters try
 
-python compare.py --instance indep_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile indep.html --signal 3 4 5 --rho 0 0.5
+python compare.py --instance AR_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile AR.html --signal 3 4 5 --rho 0 0.5 --csvfile AR.csv
 
 Also, try 
 
