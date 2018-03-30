@@ -17,8 +17,7 @@ def compare(instance,
             methods=[], 
             verbose=False,
             htmlfile=None,
-            method_setup=True,
-            distance_tol=1):
+            method_setup=True):
     
     results = [[] for m in methods]
     
@@ -53,7 +52,7 @@ def compare(instance,
             selected, active = M.select()
             tic = time.time()
             if active is not None:
-                TD = discoveries(selected, true_active, distance_tol=distance_tol)
+                TD = instance.discoveries(selected, true_active)
                 FD = len(selected) - TD
                 FDP = FD / max(TD + 1. * FD, 1.)
                 result.append((TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)))
@@ -75,17 +74,9 @@ def compare(instance,
     param = instance.params
     for col in param.columns:
         big_df[col] = param[col][0] 
-    big_df['distance_tol'] = distance_tol
+    big_df['distance_tol'] = instance.distance_tol
     return big_df
 
-def discoveries(selected, truth, distance_tol=2):
-    """
-    A discovery is within a certain distance of a true signal
-    """
-
-    delta = np.fabs(np.subtract.outer(np.asarray(selected), np.asarray(truth))).min(1)
-
-    return (delta <= distance_tol).sum()
 
 def main(opts, clean=False):
 
@@ -140,8 +131,7 @@ def main(opts, clean=False):
                           methods=_methods,
                           verbose=new_opts.verbose,
                           htmlfile=new_opts.htmlfile,
-                          method_setup=method_setup,
-                          distance_tol=opts.distance_tol)
+                          method_setup=method_setup)
 
         if opts.csvfile is not None:
 
@@ -195,8 +185,6 @@ Try:
                         help='Value of AR(1), equicor or mixed param.')
     parser.add_argument('--q', default=0.2, type=float,
                         help='target for FDR (default 0.2)')
-    parser.add_argument('--distance_tol', default=1, type=int,
-                        help='Tolerance for defining a discovery: if distance of a selection is within this many of a truth it is considered a discovery.')
     parser.add_argument('--nsim', default=100, type=int,
                         help='How many repetitions?')
     parser.add_argument('--verbose', action='store_true',
