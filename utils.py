@@ -30,7 +30,7 @@ class instance(object):
 
 class equicor_instance(instance):
 
-    name = 'Exchangeable'
+    instance_name = 'Exchangeable'
     signature = ('n', 'p', 's', 'rho')
     signal_fac = 1.5 # used in set_l_theory to set signal strength
                      # as a multiple of l_theory
@@ -75,8 +75,8 @@ class equicor_instance(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, self.signal] + [getattr(self, arg) for arg in self.signature]],
-                          columns=['name', 'signal'] + [arg for arg in self.signature])
+        df = pd.DataFrame([[self.instance_name, self.signal] + [getattr(self, arg) for arg in self.signature]],
+                          columns=['Instance', 'signal'] + [arg for arg in self.signature])
         return df
 
     def generate(self):
@@ -104,7 +104,7 @@ equicor_instance.register()
 class jelena_instance(instance):
 
     signature = None
-    name = 'Jelena'
+    instance_name = 'Jelena'
     n = 1000
     p = 2000
     s = 30
@@ -128,8 +128,8 @@ class jelena_instance(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, str(self.__class__), self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
-                          columns=['name', 'class', 'n', 'p', 's', 'signal'])
+        df = pd.DataFrame([[self.instance_name, str(self.__class__), self.n, self.p, self.s, self.signal * np.sqrt(self.n)]],
+                          columns=['Instance', 'class', 'n', 'p', 's', 'signal'])
         return df
 
     @property
@@ -143,7 +143,7 @@ jelena_instance.register()
 class jelena_instance_flip(jelena_instance):
 
     signature = None
-    name = 'Jelena, n=5000'
+    instance_name = 'Jelena, n=5000'
     n = 5000
     p = 2000
     s = 30
@@ -154,7 +154,7 @@ jelena_instance_flip.register()
 class jelena_instance_flipmore(jelena_instance):
 
     signature = None
-    name = 'Jelena, n=10000'
+    instance_name = 'Jelena, n=10000'
     n = 10000
     p = 2000
     s = 30
@@ -166,7 +166,7 @@ jelena_instance_flipmore.register()
 class jelena_instance_AR(instance):
 
     signature = None
-    name = 'Jelena AR(0.5)'
+    instance_name = 'Jelena AR(0.5)'
     n = 1000
     p = 2000
     s = 30
@@ -191,8 +191,8 @@ class jelena_instance_AR(instance):
 
     @property
     def params(self):
-        df = pd.DataFrame([[self.name, str(self.__class__), self.n, self.p, self.s, self.rho, self.signal * np.sqrt(self.n)]],
-                          columns=['name', 'class', 'n', 'p', 's', 'rho', 'signal'])
+        df = pd.DataFrame([[self.instance_name, str(self.__class__), self.n, self.p, self.s, self.rho, self.signal * np.sqrt(self.n)]],
+                          columns=['Instance', 'class', 'n', 'p', 's', 'rho', 'signal'])
         return df
 
     @property
@@ -205,7 +205,7 @@ jelena_instance_AR.register()
 
 class jelena_instance_AR75(jelena_instance_AR):
 
-    name = 'Jelena AR(0.75)'
+    instance_name = 'Jelena AR(0.75)'
     rho = 0.75
 
 jelena_instance_AR75.register()
@@ -213,7 +213,7 @@ jelena_instance_AR75.register()
 class mixed_instance(equicor_instance):
 
     signature = ('n', 'p', 's', 'rho', 'equicor_rho', 'AR_weight')
-    name = 'Mixed'
+    instance_name = 'Mixed'
 
     def __init__(self, 
                  n=500, 
@@ -280,7 +280,7 @@ mixed_instance.register()
 class indep_instance(equicor_instance):
 
     signature = ('n', 'p', 's')
-    name = 'Independent'
+    instance_name = 'Independent'
 
     def __init__(self, n=500, p=200, s=20):
         equicor_instance.__init__(self,
@@ -294,7 +294,7 @@ indep_instance.register()
 class AR_instance(equicor_instance):
 
     signature = ('n', 'p', 's', 'rho')
-    name = 'AR'
+    instance_name = 'AR'
 
     def generate(self):
 

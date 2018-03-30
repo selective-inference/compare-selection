@@ -18,7 +18,8 @@ def compare(instance,
             methods=[], 
             verbose=False,
             htmlfile=None,
-            method_setup=True):
+            method_setup=True,
+            distance_tol=1):
     
     results = [[] for m in methods]
     
@@ -32,7 +33,7 @@ def compare(instance,
 
         X, Y, beta = instance.generate()
         l_min, l_1se, l_theory = lagrange_vals(X, Y, run_CV=run_CV)
-        true_active = set(np.nonzero(beta)[0])
+        true_active = np.nonzero(beta)[0]
 
         def summary(result):
             result = np.atleast_2d(result)
@@ -53,7 +54,7 @@ def compare(instance,
             selected, active = M.select()
             tic = time.time()
             if active is not None:
-                TD = len(true_active.intersection(selected))
+                TD = discoveries(selected, true_active, distance_tol=distance_tol)
                 FD = len(selected) - TD
                 FDP = FD / max(TD + 1. * FD, 1.)
                 result.append((TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)))
@@ -78,6 +79,15 @@ def compare(instance,
         big_df[col] = param[col][0] 
 
     return big_df
+
+def discoveries(selected, truth, distance_tol=2):
+    """
+    A discovery is within a certain distance of a true signal
+    """
+
+    delta = np.fabs(np.subtract.outer(np.asarray(selected), np.asarray(truth))).min(1)
+
+    return (delta <= distance_tol).sum()
 
 def main(opts, clean=True):
 
@@ -120,8 +130,8 @@ def main(opts, clean=True):
             instance.signal = new_opts.signal_strength
 
         if opts.csvfile is not None:
-            new_opts.csvfile = (opts.csvfile + 
-                       "_signal%f_rho%f" % (new_opts.signal_strength,
+            new_opts.csvfile = (os.path.splitext(opts.csvfile)[0] + 
+                       "_signal%f_rho%f.csv" % (new_opts.signal_strength,
                                             new_opts.rho))
 
         results = compare(instance,
@@ -134,7 +144,7 @@ def main(opts, clean=True):
         if opts.csvfile is not None:
 
             f = open(new_opts.csvfile, 'w')
-            f.write(results.to_csv() + '\n')
+            f.write(results.to_csv(index_label='Method') + '\n')
             f.close()
 
             csvfiles = glob(opts.csvfile + '_signal*')
@@ -184,6 +194,8 @@ Try:
                         help='Value of AR(1), equicor or mixed param.')
     parser.add_argument('--q', default=0.2, type=float,
                         help='target for FDR (default 0.2)')
+    parser.add_argument('--distance_tol', default=1, type=int,
+                        help='Tolerance for defining a discovery: if distance of a selection is within this many of a truth it is considered a discovery.')
     parser.add_argument('--nsim', default=100, type=int,
                         help='How many repetitions?')
     parser.add_argument('--verbose', action='store_true',
