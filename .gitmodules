@@ -4,3 +4,6 @@
 [submodule "R-selective"]
 	path = R-selective
 	url = https://github.com/jonathan-taylor/R-selective.git
+[submodule "travis-tools"]
+	path = travis-tools
+	url = https://github.com/matthew-brett/travis-tools
