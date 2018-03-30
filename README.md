@@ -31,4 +31,5 @@ Also, try
 python compare.py --help
 python compare.py --list_instances
 python compare.py --list_methods
-
+ 
+##### Travis test
