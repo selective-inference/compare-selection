@@ -1,5 +1,5 @@
 import numpy as np
-from utils import jelena_instance_AR
+from jelena_instances import jelena_instance_AR
 
 class small(jelena_instance_AR):
 

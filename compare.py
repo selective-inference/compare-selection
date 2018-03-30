@@ -6,7 +6,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from utils import instances, lagrange_vals
+from utils import data_instances, lagrange_vals
 from methods import methods
 
 import knockoff_phenom # more instances
@@ -82,7 +82,7 @@ def main(opts, clean=False):
 
     if opts.list_instances:
         print('Instances:\n')
-        print(sorted(instances.keys()))
+        print(sorted(data_instances.keys()))
     if opts.list_methods:
         print('Methods:\n')
         print(sorted(methods.keys()))
@@ -110,7 +110,7 @@ def main(opts, clean=False):
         new_opts.rho = rho
 
         _methods = [methods[n] for n in new_opts.methods]
-        _instance = instances[new_opts.instance]
+        _instance = data_instances[new_opts.instance]
 
         if _instance.signature is None:
             instance = _instance()
