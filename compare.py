@@ -48,7 +48,7 @@ def compare(instance,
 
         for method, result in zip(methods, results):
             toc = time.time()
-            M = method(X, Y, l_theory, l_min, l_1se, instance.sigma)
+            M = method(X, Y, l_theory, l_min, l_1se)
             M.q = q
             selected, active = M.select()
             tic = time.time()
