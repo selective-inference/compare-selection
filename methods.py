@@ -79,11 +79,12 @@ class knockoffs_sigma(generic_method):
         # see if we've factored this before
 
         have_factorization = False
-        factors = glob.glob('knockoff_factorizations/*%s*npz' % cls.factor_method)
+        factors = glob.glob('knockoff_factorizations/*npz')
         for factor in factors:
             factor = np.load(factor)
             sigma_f = factor['sigma']
             if ((sigma_f.shape == sigma.shape) and
+                (factor['method'] == cls.factor_method) and
                 np.allclose(sigma_f, sigma)):
                 have_factorization = True
                 cls.knockoff_chol = factor['knockoff_chol']
@@ -112,7 +113,7 @@ class knockoffs_sigma(generic_method):
             ''')
         numpy2ri.deactivate()
 
-        if True: #try:
+        try:
             numpy2ri.activate()
             rpy.r.assign('X', self.X)
             rpy.r.assign('Y', self.Y)
@@ -122,7 +123,7 @@ class knockoffs_sigma(generic_method):
             V = rpy.r('V')
             numpy2ri.deactivate()
             return np.asarray(V, np.int), np.asarray(V, np.int)
-        else: #except:
+        except:
             return [], []
 
 knockoffs_sigma.register()
@@ -148,7 +149,8 @@ def factor_knockoffs(sigma, method='asdp'):
     knockoff_chol = np.asarray(rpy.r('chol_k'))
     SigmaInv_s = np.asarray(rpy.r('SigmaInv_s'))
     diag_s = np.asarray(rpy.r('diag_s'))
-    np.savez('knockoff_factorizations/%s_%s.npz' % (os.path.split(tempfile.mkstemp()[1])[1], method),
+    np.savez('knockoff_factorizations/%s.npz' % (os.path.split(tempfile.mkstemp()[1])[1],),
+             method=method,
              sigma=sigma,
              diag_s=diag_s,
              SigmaInv_s=SigmaInv_s,
