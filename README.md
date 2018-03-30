@@ -4,14 +4,16 @@ selective (conditional) inference and knockoffs.
 To install
 ----------
 
-git submodule update --init
-cd R-software
-git submodule update --init
-make install
-cd ../selective-inference
-git submodule update --init
-pip install -r requirements.txt
-pip install -e .
+```
+git submodule update --init;
+cd R-software;
+git submodule update --init;
+make install;
+cd ../selective-inference;
+git submodule update --init;
+pip install -r requirements.txt;
+pip install -e .;
+```
 
 Testing
 -------
