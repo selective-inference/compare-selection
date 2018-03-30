@@ -79,7 +79,7 @@ class knockoffs_sigma(generic_method):
         # see if we've factored this before
 
         have_factorization = False
-        factors = glob.glob('knockoff_factorizations/*npz')
+        factors = glob.glob('.knockoff_factorizations/*npz')
         for factor in factors:
             factor = np.load(factor)
             sigma_f = factor['sigma']
@@ -90,7 +90,10 @@ class knockoffs_sigma(generic_method):
                 cls.knockoff_chol = factor['knockoff_chol']
 
         if not have_factorization:
+            print('doing factorization')
             cls.knockoff_chol = factor_knockoffs(sigma, cls.factor_method)
+        else:
+            print('found factorization')
 
         numpy2ri.deactivate()
 
@@ -145,11 +148,9 @@ def factor_knockoffs(sigma, method='asdp'):
     knockoff_chol = np.asarray(rpy.r('chol_k'))
     SigmaInv_s = np.asarray(rpy.r('SigmaInv_s'))
     diag_s = np.asarray(rpy.r('diag_s'))
-    np.savez('knockoff_factorizations/%s.npz' % (os.path.split(tempfile.mkstemp()[1])[1],),
+    np.savez('.knockoff_factorizations/%s.npz' % (os.path.split(tempfile.mkstemp()[1])[1],),
              method=method,
              sigma=sigma,
-             diag_s=diag_s,
-             SigmaInv_s=SigmaInv_s,
              knockoff_chol=knockoff_chol)
 
     return knockoff_chol
