@@ -1,0 +1,4 @@
+This directory will contain cached information computed for Gaussian knockoffs that
+will save time when rerunning problems with same covariance matrix for Gaussian features.
+
+THERE IS NO REASON TO ADD THESE TO THE git REPO.

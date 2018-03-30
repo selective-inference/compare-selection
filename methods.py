@@ -1,3 +1,5 @@
+import tempfile, os, glob
+
 import numpy as np
 import regreg.api as rr
 
@@ -67,37 +69,50 @@ knockoffs_mf.register()
 class knockoffs_sigma(generic_method):
 
     method_name = 'ModelX Knockoffs with Sigma, asdp, (full)'
+    factor_method = 'asdp'
 
     @classmethod
     def setup(cls, sigma):
 
         numpy2ri.activate()
-        rpy.r.assign('Sigma', sigma)
-        rpy.r('''
 
-    # Compute the Cholesky -- from create.gaussian
+        # see if we've factored this before
 
-    diag_s = create.solve_asdp(Sigma)
-    if (is.null(dim(diag_s))) {
-        diag_s = diag(diag_s, length(diag_s))
-    }
-    SigmaInv_s = solve(Sigma, diag_s)
-    Sigma_k = 2 * diag_s - diag_s %*% SigmaInv_s
-    chol_k = chol(Sigma_k)
+        have_factorization = False
+        factors = glob.glob('knockoff_factorizations/*%s*npz' % cls.factor_method)
+        for factor in factors:
+            factor = np.load(factor)
+            sigma_f = factor['sigma']
+            if ((sigma_f.shape == sigma.shape) and
+                np.allclose(sigma_f, sigma)):
+                have_factorization = True
+                cls.knockoff_chol = factor['knockoff_chol']
+                cls.SigmaInv_s = factor['SigmaInv_s']
+                cls.diag_s = factor['diag_s']
 
-    knockoffs = function(X) {
-       mu = rep(0, ncol(X))
-       mu_k = X # sweep(X, 2, mu, "-") %*% SigmaInv_s
-       Sigma_k = 2 * diag_s - diag_s %*% SigmaInv_s
-       X_k = mu_k + matrix(rnorm(ncol(X) * nrow(X)), nrow(X)) %*% 
-        chol_k
-       return(X_k)
-    }
-        ''')
+        if not have_factorization:
+            cls.knockoff_chol, cls.SigmaInv_s, cls.diag_s = factor_knockoffs(sigma, cls.factor_method)
+
         numpy2ri.deactivate()
 
     def select(self):
-        try:
+
+        numpy2ri.activate()
+        rpy.r.assign('chol_k', self.knockoff_chol)
+        rpy.r.assign('SigmaInv_s', self.SigmaInv_s)
+        rpy.r.assign('diag_s', self.diag_s)
+        rpy.r('''
+        knockoffs = function(X) {
+           mu = rep(0, ncol(X))
+           mu_k = X # sweep(X, 2, mu, "-") %*% SigmaInv_s
+           X_k = mu_k + matrix(rnorm(ncol(X) * nrow(X)), nrow(X)) %*% 
+            chol_k
+           return(X_k)
+        }
+            ''')
+        numpy2ri.deactivate()
+
+        if True: #try:
             numpy2ri.activate()
             rpy.r.assign('X', self.X)
             rpy.r.assign('Y', self.Y)
@@ -107,56 +122,44 @@ class knockoffs_sigma(generic_method):
             V = rpy.r('V')
             numpy2ri.deactivate()
             return np.asarray(V, np.int), np.asarray(V, np.int)
-        except:
+        else: #except:
             return [], []
 
 knockoffs_sigma.register()
 
-class knockoffs_sigma_equi(generic_method):
+def factor_knockoffs(sigma, method='asdp'):
 
-    method_name = 'ModelX Knockoffs with Sigma, equi, (full)'
-
-    @classmethod
-    def setup(cls, sigma):
-
-        numpy2ri.activate()
-        rpy.r.assign('Sigma', sigma)
-        rpy.r('''
+    numpy2ri.activate()
+    rpy.r.assign('Sigma', sigma)
+    rpy.r.assign('method', method)
+    rpy.r('''
 
     # Compute the Cholesky -- from create.gaussian
 
-    diag_s = create.solve_equi(Sigma)
+    diag_s = diag(switch(method, equi = create.solve_equi(Sigma), 
+                  sdp = create.solve_sdp(Sigma), asdp = create.solve_asdp(Sigma)))
     if (is.null(dim(diag_s))) {
         diag_s = diag(diag_s, length(diag_s))
     }
     SigmaInv_s = solve(Sigma, diag_s)
     Sigma_k = 2 * diag_s - diag_s %*% SigmaInv_s
     chol_k = chol(Sigma_k)
+    ''')
+    knockoff_chol = np.asarray(rpy.r('chol_k'))
+    SigmaInv_s = np.asarray(rpy.r('SigmaInv_s'))
+    diag_s = np.asarray(rpy.r('diag_s'))
+    np.savez('knockoff_factorizations/%s_%s.npz' % (os.path.split(tempfile.mkstemp()[1])[1], method),
+             sigma=sigma,
+             diag_s=diag_s,
+             SigmaInv_s=SigmaInv_s,
+             knockoff_chol=knockoff_chol)
 
-    knockoffs = function(X) {
-       mu = rep(0, ncol(X))
-       mu_k = X # sweep(X, 2, mu, "-") %*% SigmaInv_s
-       Sigma_k = 2 * diag_s - diag_s %*% SigmaInv_s
-       X_k = mu_k + matrix(rnorm(ncol(X) * nrow(X)), nrow(X)) %*% 
-        chol_k
-       return(X_k)
-    }
-        ''')
-        numpy2ri.deactivate()
+    return knockoff_chol, SigmaInv_s, diag_s
 
-    def select(self):
-        try:
-            numpy2ri.activate()
-            rpy.r.assign('X', self.X)
-            rpy.r.assign('Y', self.Y)
-            rpy.r.assign('q', self.q)
-            rpy.r('V=knockoff.filter(X, Y, fdr=q, knockoffs=knockoffs)$selected')
-            rpy.r('if (length(V) > 0) {V = V-1}')
-            V = rpy.r('V')
-            numpy2ri.deactivate()
-            return np.asarray(V, np.int), np.asarray(V, np.int)
-        except:
-            return [], []
+class knockoffs_sigma_equi(knockoffs_sigma):
+
+    method_name = 'ModelX Knockoffs with Sigma, equi, (full)'
+    factor_method = 'equi'
 
 knockoffs_sigma_equi.register()
 
