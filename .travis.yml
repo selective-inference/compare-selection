@@ -67,11 +67,6 @@ before_install:
 
 install:
   # Install selection
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then 
-      pip install  -r requirements.txt -c constraints.txt; 
-    else
-      pip install  -r requirements.txt; 
-    fi
   - git submodule update --init 
   - cd R-software
   - git submodule update --init 
