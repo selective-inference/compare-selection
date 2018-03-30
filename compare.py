@@ -87,7 +87,7 @@ def discoveries(selected, truth, distance_tol=2):
 
     return (delta <= distance_tol).sum()
 
-def main(opts, clean=True):
+def main(opts, clean=False):
 
     if opts.list_instances:
         print('Instances:\n')
@@ -126,7 +126,7 @@ def main(opts, clean=True):
         else:
             instance = _instance(**dict([(n, getattr(new_opts, n)) for n in _instance.signature if hasattr(new_opts, n)]))
 
-        if signal is not None:
+        if signal is not None: # here is where signal_fac can be ignored
             instance.signal = new_opts.signal_strength
 
         if opts.csvfile is not None:
@@ -146,6 +146,7 @@ def main(opts, clean=True):
         if opts.csvfile is not None:
 
             f = open(new_opts.csvfile, 'w')
+            f.write('# parsed arguments: ' + str(new_opts) + '\n') # comment line indicating arguments used
             f.write(results.to_csv(index=False) + '\n')
             f.close()
 
@@ -187,7 +188,7 @@ Try:
                         dest='signal_strength',
                         help='signal strength to override instance default (default value: None) -- signals are all of this magnitude, randomly placed with random signs')
     parser.add_argument('--signal_fac', default=1.2, type=float,
-                        help='Scale applied to theoretical lambda to get signal size.')
+                        help='Scale applied to theoretical lambda to get signal size. Ignored if --signal is used.')
     parser.add_argument('--rho', nargs='+', type=float,
                         default=0.5,
                         dest='rho',
