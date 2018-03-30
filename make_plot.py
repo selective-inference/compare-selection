@@ -24,7 +24,7 @@ def make_plot_rho_fixed(csvfile,
     for method in methods:
         df_ = df[df['Method'] == method]
         if len(df_) > 0:
-            ax.plot(signal, df_[metric], 'o--', label=method)
+            ax.plot(df_['signal'], df_[metric], 'o--', label=method)
             print(method)
     if ylim:
         ax.set_ylim(ylim)
@@ -51,7 +51,7 @@ def make_plot_signal_fixed(csvfile,
     for method in methods:
         df_ = df[df['Method'] == method]
         if len(df_) > 0:
-            ax.plot(rho, df_[metric], 'o--', label=method)
+            ax.plot(df_['rho'], df_[metric], 'o--', label=method)
             print(method)
     if ylim:
         ax.set_ylim(ylim)

@@ -19,6 +19,7 @@ instances = {}
 
 class instance(object):
 
+    distance_tol = 0
     signature = None
 
     def generate(self):
@@ -27,6 +28,15 @@ class instance(object):
     @classmethod
     def register(cls):
         instances[cls.__name__] = cls
+
+    def discoveries(self, selected, truth):
+        """
+        A discovery is within a certain distance of a true signal
+        """
+
+        delta = np.fabs(np.subtract.outer(np.asarray(selected), np.asarray(truth))).min(1)
+
+        return (delta <= self.distance_tol).sum()
 
 class equicor_instance(instance):
 
@@ -237,6 +247,13 @@ class mixed_instance(equicor_instance):
 
         self.set_l_theory()
 
+        if rho < 0.25:
+            self.distance_tol = 0
+        elif rho < 0.5:
+            self.distance_tol = 1
+        else:
+            self.distance_tol = 2
+
     def generate(self):
 
         (n, p, s, rho) = (self.n,
@@ -277,24 +294,27 @@ class mixed_instance(equicor_instance):
 
 mixed_instance.register()
 
-class indep_instance(equicor_instance):
-
-    signature = ('n', 'p', 's')
-    instance_name = 'Independent'
-
-    def __init__(self, n=500, p=200, s=20):
-        equicor_instance.__init__(self,
-                                  n=n,
-                                  p=p,
-                                  s=s,
-                                  rho=0.)
-
-indep_instance.register()
 
 class AR_instance(equicor_instance):
 
     signature = ('n', 'p', 's', 'rho')
     instance_name = 'AR'
+
+    def __init__(self, n=500, p=200, s=20, rho=0.5):
+
+        (self.n,
+         self.p,
+         self.s,
+         self.rho) = (n, p, s, rho)
+
+        self.set_l_theory()
+
+        if rho < 0.25:
+            self.distance_tol = 0
+        elif rho < 0.5:
+            self.distance_tol = 1
+        else:
+            self.distance_tol = 2
 
     def generate(self):
 
@@ -317,7 +337,6 @@ class AR_instance(equicor_instance):
         if not hasattr(self, "_sigma"):
             self._sigma = self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p)))
         return self._sigma
-
 
 AR_instance.register()
 
