@@ -69,7 +69,7 @@ def compare(instance,
 
                 if htmlfile is not None:
                     f = open(htmlfile, 'w')
-                    f.write(df.to_html() + '\n')
+                    f.write(df.to_html(index_label='Method') + '\n')
                     f.write(instance.params.to_html())
                     f.close()
 
