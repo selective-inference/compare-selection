@@ -1,4 +1,4 @@
-,Unnamed: 0,Replicates,Full model power,SD(Full model power),False discoveries,Full model FDR,SD(Full model FDR),Time,Active,name,signal,n,p,s,rho
+,Method,Replicates,Full model power,SD(Full model power),False discoveries,Full model FDR,SD(Full model FDR),Time,Active,name,signal,n,p,s,rho
 0,ModelX Knockoffs with Sigma (full),100,0.401666666667,0.020614854407,2.81,0.126670513029,0.0130085639033,29.473575511,14.86,AR,3.5,1000,2000,30,0.0
 1,"Randomized LASSO + theory, smaller noise (selected)",100,0.299333333333,0.00865357986295,0.98,0.0924866048984,0.0091452155955,2.32637909174,17.02,AR,3.5,1000,2000,30,0.0
 2,"Randomized LASSO + theory, aggressive, smaller noise (selected)",100,0.419,0.0110680220054,3.03,0.183476317537,0.00954572317949,5.87426538467,44.69,AR,3.5,1000,2000,30,0.0

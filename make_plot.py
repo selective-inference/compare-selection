@@ -22,7 +22,7 @@ def make_plot_rho_fixed(csvfile,
     if ax is None:
         ax = fig.gca()
     for method in methods:
-        df_ = df[df[df.columns[1]] == method]
+        df_ = df[df['Method'] == method]
         if len(df_) > 0:
             ax.plot(signal, df_[metric], 'o--', label=method)
             print(method)
@@ -49,7 +49,7 @@ def make_plot_signal_fixed(csvfile,
     if ax is None:
         ax = fig.gca()
     for method in methods:
-        df_ = df[df[df.columns[1]] == method]
+        df_ = df[df['Method'] == method]
         if len(df_) > 0:
             ax.plot(rho, df_[metric], 'o--', label=method)
             print(method)

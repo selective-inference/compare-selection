@@ -1,7 +1,6 @@
 import os
 from copy import copy
 from itertools import product
-from glob import glob
 import time
 
 import numpy as np
@@ -60,16 +59,15 @@ def compare(instance,
                 result.append((TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)))
 
             if i > 0:
-                df = pd.DataFrame([summary(r) for r in results], 
-                                  index=[m.method_name for m in methods],
-                                  columns=['Replicates', 'Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
+                df = pd.DataFrame([[m.method_name] + summary(r) for m, r in zip(methods, results)], 
+                                  columns=['Method', 'Replicates', 'Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
 
                 if verbose:
                     print(df[['Replicates', 'Full model power', 'Time']])
 
                 if htmlfile is not None:
                     f = open(htmlfile, 'w')
-                    f.write(df.to_html(index_label='Method') + '\n')
+                    f.write(df.to_html(index=False) + '\n')
                     f.write(instance.params.to_html())
                     f.close()
 
@@ -77,7 +75,7 @@ def compare(instance,
     param = instance.params
     for col in param.columns:
         big_df[col] = param[col][0] 
-
+    big_df['distance_tol'] = distance_tol
     return big_df
 
 def discoveries(selected, truth, distance_tol=2):
@@ -107,6 +105,8 @@ def main(opts, clean=True):
 
     new_opts = copy(opts)
     prev_rho = np.nan
+
+    csvfiles = []
     for rho, signal in product(np.atleast_1d(opts.rho),
                                signal_vals):
 
@@ -131,29 +131,29 @@ def main(opts, clean=True):
 
         if opts.csvfile is not None:
             new_opts.csvfile = (os.path.splitext(opts.csvfile)[0] + 
-                       "_signal%f_rho%f.csv" % (new_opts.signal_strength,
-                                            new_opts.rho))
+                       "_signal%0.1f_rho%0.2f.csv" % (new_opts.signal_strength,
+                                                      new_opts.rho))
+        csvfiles.append(new_opts.csvfile)
 
         results = compare(instance,
                           nsim=new_opts.nsim,
                           methods=_methods,
                           verbose=new_opts.verbose,
                           htmlfile=new_opts.htmlfile,
-                          method_setup=method_setup)
+                          method_setup=method_setup,
+                          distance_tol=opts.distance_tol)
 
         if opts.csvfile is not None:
 
             f = open(new_opts.csvfile, 'w')
-            f.write(results.to_csv(index_label='Method') + '\n')
+            f.write(results.to_csv(index=False) + '\n')
             f.close()
 
-            csvfiles = glob(opts.csvfile + '_signal*')
             dfs = [pd.read_csv(f) for f in csvfiles]
             df = pd.concat(dfs)
-            df.to_csv(opts.csvfile)
+            df.to_csv(opts.csvfile, index=False)
 
     if clean:
-        csvfiles = glob(opts.csvfile + '_signal*')
         [os.remove(f) for f in csvfiles]
 
 if __name__ == "__main__":
