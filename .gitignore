@@ -1,8 +1,15 @@
+.Rhistory
+.Rdata
 .knockoff_factorizations/*
+*pyc
 *csv
 *pdf
+*png
 *html
 simresults/*pdf
+simresults/*pdf
+simresults/*png
 simresults/*html
+simresults/*csv
 *~
 */*~
