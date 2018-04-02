@@ -7,3 +7,6 @@
 [submodule "travis-tools"]
 	path = travis-tools
 	url = https://github.com/matthew-brett/travis-tools
+[submodule "regreg"]
+	path = regreg
+	url = https://github.com/jonathan-taylor/regreg.git
