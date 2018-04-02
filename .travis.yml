@@ -27,7 +27,7 @@ before_install:
 install:
   # Install selection
   - git submodule update --init 
-  - cd R-software
+  - cd R-selective
   - git submodule update --init 
   - make install
   - cd ../regreg
