@@ -13,6 +13,7 @@ cd ../selective-inference;
 git submodule update --init;
 pip install -r requirements.txt;
 pip install -e .;
+cd ..;
 ```
 
 Testing
