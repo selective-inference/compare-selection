@@ -30,7 +30,7 @@ def compare(instance,
     for i in range(nsim):
 
         X, Y, beta = instance.generate()
-        l_min, l_1se, l_theory = lagrange_vals(X, Y, run_CV=run_CV)
+        l_min, l_1se, l_theory = lagrange_vals(X.copy(), Y.copy(), run_CV=run_CV)
         true_active = np.nonzero(beta)[0]
 
         def summary(result):
@@ -47,7 +47,7 @@ def compare(instance,
 
         for method, result in zip(methods, results):
             toc = time.time()
-            M = method(X, Y, l_theory, l_min, l_1se)
+            M = method(X.copy(), Y.copy(), l_theory, l_min, l_1se)
             M.q = q
             selected, active = M.select()
             tic = time.time()
@@ -140,7 +140,7 @@ def main(opts, clean=False):
             f.write(results.to_csv(index=False) + '\n')
             f.close()
 
-            dfs = [pd.read_csv(f) for f in csvfiles]
+            dfs = [pd.read_csv(f, comment='#') for f in csvfiles]
             df = pd.concat(dfs)
             df.to_csv(opts.csvfile, index=False)
 
@@ -156,7 +156,7 @@ if __name__ == "__main__":
 Compare different LASSO methods in terms of full model FDR and Power.
 
 Try:
-    python compare.py --instance indep_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile indep.html
+    python compare.py --instance indep_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile indep.html --csvfile indep.csv
 ''')
     parser.add_argument('--instance',
                         dest='instance', help='Which instance to generate data from -- only one choice. To see choices run --list_instances.')

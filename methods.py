@@ -79,21 +79,22 @@ class knockoffs_sigma(generic_method):
         # see if we've factored this before
 
         have_factorization = False
+        if not os.path.exists('.knockoff_factorizations'):
+            os.mkdir('.knockoff_factorizations')
         factors = glob.glob('.knockoff_factorizations/*npz')
-        for factor in factors:
-            factor = np.load(factor)
+        for factor_file in factors:
+            factor = np.load(factor_file)
             sigma_f = factor['sigma']
             if ((sigma_f.shape == sigma.shape) and
                 (factor['method'] == cls.factor_method) and
                 np.allclose(sigma_f, sigma)):
                 have_factorization = True
+                print('found factorization: %s' % factor_file)
                 cls.knockoff_chol = factor['knockoff_chol']
 
         if not have_factorization:
             print('doing factorization')
             cls.knockoff_chol = factor_knockoffs(sigma, cls.factor_method)
-        else:
-            print('found factorization')
 
         numpy2ri.deactivate()
 
