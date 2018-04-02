@@ -11,6 +11,7 @@ git submodule update --init;
 make install;
 cd ../regreg;
 git submodule update --init;
+pip install -r requirements.txt;
 pip install -e .;
 cd ../selective-inference;
 git submodule update --init;
