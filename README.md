@@ -6,7 +6,7 @@ To install
 
 ```
 git submodule update --init;
-cd R-software;
+cd R-selective;
 git submodule update --init;
 make install;
 cd ../selective-inference;
