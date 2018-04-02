@@ -17,7 +17,8 @@ def compare(instance,
             methods=[], 
             verbose=False,
             htmlfile=None,
-            method_setup=True):
+            method_setup=True,
+            csvfile=None):
     
     results = [[] for m in methods]
     
@@ -68,6 +69,11 @@ def compare(instance,
                     f = open(htmlfile, 'w')
                     f.write(df.to_html(index=False) + '\n')
                     f.write(instance.params.to_html())
+                    f.close()
+
+                if htmlfile is not None:
+                    f = open(csvfile, 'w')
+                    f.write(df.to_csv(index=False) + '\n')
                     f.close()
 
     big_df = copy(df)
@@ -131,7 +137,8 @@ def main(opts, clean=False):
                           methods=_methods,
                           verbose=new_opts.verbose,
                           htmlfile=new_opts.htmlfile,
-                          method_setup=method_setup)
+                          method_setup=method_setup,
+                          csvfile=new_opts.csvfile)
 
         if opts.csvfile is not None:
 
