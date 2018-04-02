@@ -14,11 +14,6 @@ env:
     global:
         # Maximal dependencies
         - DEPENDS="cython numpy scipy matplotlib"
-matrix:
-  include:
-    - python: 3.5
-      env:
-        - RUN_R_TESTS=1
 before_install:
   - source travis-tools/utils.sh
   - travis_before_install
