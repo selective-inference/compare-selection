@@ -288,7 +288,7 @@ class liu_R_theory(liu_theory):
         n = nrow(X);
 
         if (p >= n) { 
-            sigma_est = estimate_sigma(X, y, coef(CV, s="lambda.min")[-1]) # sigma via Reid et al.
+            sigma_est = selectiveInference:::estimate_sigma(X, y, coef(CV, s="lambda.min")[-1]) # sigma via Reid et al.
         } else {
             sigma_est = sigma(lm(y ~ X - 1))
         }
