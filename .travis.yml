@@ -29,17 +29,13 @@ install:
   - git submodule update --init 
   - cd R-selective
   - git submodule update --init 
-  - make install
+  - sudo make install
   - cd ../regreg
   - pip install -r requirements.txt
   - pip install -e .
   - cd ../selective-inference
   - git submodule update --init 
-  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then 
-      pip install  -r requirements.txt -c constraints.txt; 
-    else
-      pip install  -r requirements.txt; 
-    fi
+  - pip install  -r requirements.txt; 
   - pip install -e .
   - cd ..
 
