@@ -29,7 +29,7 @@ install:
   - git submodule update --init 
   - cd R-selective
   - git submodule update --init 
-  - sudo Rscript -e "install.packages(c('glmnet', 'intervals', 'adaptMCMC', 'gglasso'), repos='http://cloud.r-project.org')"
+  - sudo Rscript -e "install.packages(c('glmnet', 'intervals', 'adaptMCMC', 'gglasso', 'knockoff'), repos='http://cloud.r-project.org')"
   - sudo make install
   - cd ../regreg
   - pip install -r requirements.txt
