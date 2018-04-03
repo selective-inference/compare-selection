@@ -81,7 +81,7 @@ def compare(instance,
     for col in param.columns:
         big_df[col] = param[col][0] 
     big_df['distance_tol'] = instance.distance_tol
-    return big_df
+    return big_df, results
 
 
 def main(opts, clean=False):
@@ -104,6 +104,7 @@ def main(opts, clean=False):
     prev_rho = np.nan
 
     csvfiles = []
+    results_dict = {}
     for rho, signal in product(np.atleast_1d(opts.rho),
                                signal_vals):
 
@@ -132,19 +133,19 @@ def main(opts, clean=False):
                                                       new_opts.rho))
         csvfiles.append(new_opts.csvfile)
 
-        results = compare(instance,
-                          nsim=new_opts.nsim,
-                          methods=_methods,
-                          verbose=new_opts.verbose,
-                          htmlfile=new_opts.htmlfile,
-                          method_setup=method_setup,
-                          csvfile=new_opts.csvfile)
-
+        results_df, results = compare(instance,
+                                      nsim=new_opts.nsim,
+                                      methods=_methods,
+                                      verbose=new_opts.verbose,
+                                      htmlfile=new_opts.htmlfile,
+                                      method_setup=method_setup,
+                                      csvfile=new_opts.csvfile)
+        results_dict[(rho, signal)] = results
         if opts.csvfile is not None:
 
             f = open(new_opts.csvfile, 'w')
             f.write('# parsed arguments: ' + str(new_opts) + '\n') # comment line indicating arguments used
-            f.write(results.to_csv(index=False) + '\n')
+            f.write(results_df.to_csv(index=False) + '\n')
             f.close()
 
             dfs = [pd.read_csv(f, comment='#') for f in csvfiles]
@@ -153,6 +154,9 @@ def main(opts, clean=False):
 
     if opts.clean:
         [os.remove(f) for f in csvfiles]
+
+    return results_dict
+
 
 if __name__ == "__main__":
 
@@ -205,5 +209,5 @@ Try:
 
     opts = parser.parse_args()
 
-    main(opts)
+    results = main(opts)
 

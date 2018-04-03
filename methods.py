@@ -275,43 +275,46 @@ class liu_R_theory(liu_theory):
     method_name = "Liu + theory (R code)"
 
     def select(self):
-        numpy2ri.activate()
-        rpy.r.assign('X', self.X)
-        rpy.r.assign('y', self.Y)
-        rpy.r('y = as.numeric(y)')
-        rpy.r.assign('q', self.q)
-        rpy.r.assign('lam', self.lagrange[0])
-        rpy.r('''
-    CV = cv.glmnet(X, y, standardize=FALSE, intercept=FALSE, family=selectiveInference:::family_label("ls"))
-    p = ncol(X);
-    n = nrow(X);
+        if True: #try:
+            numpy2ri.activate()
+            rpy.r.assign('X', self.X)
+            rpy.r.assign('y', self.Y)
+            rpy.r('y = as.numeric(y)')
+            rpy.r.assign('q', self.q)
+            rpy.r.assign('lam', self.lagrange[0])
+            rpy.r('''
+        CV = cv.glmnet(X, y, standardize=FALSE, intercept=FALSE, family=selectiveInference:::family_label("ls"))
+        p = ncol(X);
+        n = nrow(X);
 
-    if (p >= n) { 
-        sigma_est = estimate_sigma(X, y, coef(CV, s="lambda.min")[-1]) # sigma via Reid et al.
-    } else {
-        sigma_est = sigma(lm(y ~ X - 1))
-    }
-    print(sigma_est)
-    penalty_factor = rep(1, p);
-    lam = lam / sqrt(n);  # lambdas are passed a sqrt(n) free from python code
-    soln = selectiveInference:::solve_problem_glmnet(X, y, lam, penalty_factor=penalty_factor, loss="ls")
-    PVS = selectiveInference:::inference_group_lasso(X, y, 
-                                                     soln, groups=1:ncol(X), 
-                                                     lambda=lam, penalty_factor=penalty_factor, 
-                                                     sigma_est, loss="ls", algo="glmnet", 
-                                                     construct_ci=FALSE)
-    active_vars=PVS$active_vars - 1 # for 0-based
-    pvalues = PVS$pvalues
-    ''')
+        if (p >= n) { 
+            sigma_est = estimate_sigma(X, y, coef(CV, s="lambda.min")[-1]) # sigma via Reid et al.
+        } else {
+            sigma_est = sigma(lm(y ~ X - 1))
+        }
+        print(sigma_est)
+        penalty_factor = rep(1, p);
+        lam = lam / sqrt(n);  # lambdas are passed a sqrt(n) free from python code
+        soln = selectiveInference:::solve_problem_glmnet(X, y, lam, penalty_factor=penalty_factor, loss="ls")
+        PVS = selectiveInference:::inference_group_lasso(X, y, 
+                                                         soln, groups=1:ncol(X), 
+                                                         lambda=lam, penalty_factor=penalty_factor, 
+                                                         sigma_est, loss="ls", algo="Q", 
+                                                         construct_ci=FALSE)
+        active_vars=PVS$active_vars - 1 # for 0-based
+        pvalues = PVS$pvalues
+        ''')
 
-        pvalues = np.asarray(rpy.r('pvalues'))
-        active_set = np.asarray(rpy.r('active_vars'))
-        numpy2ri.deactivate()
-        if len(active_set) > 0:
-            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
-        else:
-            selected = []
-        return selected, active_set
+            pvalues = np.asarray(rpy.r('pvalues'))
+            active_set = np.asarray(rpy.r('active_vars'))
+            numpy2ri.deactivate()
+            if len(active_set) > 0:
+                selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            else:
+                selected = []
+            return selected, active_set
+        else: # except:
+            return [np.nan], [np.nan] # some R failure occurred 
 liu_R_theory.register()
 
 class lee_full_R_theory(liu_theory):
