@@ -278,12 +278,15 @@ class liu_R_theory(liu_theory):
         numpy2ri.activate()
         rpy.r.assign('X', self.X)
         rpy.r.assign('y', self.Y)
+        rpy.r('y = as.numeric(y)')
         rpy.r.assign('q', self.q)
         rpy.r.assign('lam', self.lagrange[0])
         rpy.r('''
     sigma_est=selectiveInference:::estimate_sigma(X,y,coef(CV, s="lambda.min")[-1]) # sigma via Reid et al.
-    p = ncol(X)
-    penalty_factor = rep(1, p)
+    p = ncol(X);
+    n = nrow(X);
+    penalty_factor = rep(1, p);
+    lam = lam / sqrt(n);  # lambdas are passed a sqrt(n) free from python code
     soln = selectiveInference:::solve_problem_glmnet(X, y, lam, penalty_factor=penalty_factor, loss="ls")
     PVS = selectiveInference:::inference_group_lasso(X, y, 
                                                      soln, groups=1:ncol(X), 
@@ -293,12 +296,11 @@ class liu_R_theory(liu_theory):
     active_vars=PVS$active_vars - 1 # for 0-based
     pvalues = PVS$pvalues
     ''')
-        rpy.r('print(pvalues)')
+
         pvalues = np.asarray(rpy.r('pvalues'))
-        print(pvalues)
-        active = np.asarray(rpy.r('active_vars'))
+        active_set = np.asarray(rpy.r('active_vars'))
         numpy2ri.deactivate()
-        if len(pvalues) > 0:
+        if len(active_set) > 0:
             selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
         else:
             selected = []
