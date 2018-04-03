@@ -283,10 +283,15 @@ class liu_R_theory(liu_theory):
         rpy.r.assign('lam', self.lagrange[0])
         rpy.r('''
     CV = cv.glmnet(X, y, standardize=FALSE, intercept=FALSE, family=selectiveInference:::family_label("ls"))
-    sigma_est=selectiveInference:::estimate_sigma(X,y,coef(CV, s="lambda.min")[-1])[['sigmahat']] # sigma via Reid et al.
-
     p = ncol(X);
     n = nrow(X);
+
+    if (p >= n) { 
+        sigma_est = estimate_sigma(X, y, coef(CV, s="lambda.min")[-1]) # sigma via Reid et al.
+    } else {
+        sigma_est = sigma(lm(y ~ X - 1))
+    }
+    print(sigma_est)
     penalty_factor = rep(1, p);
     lam = lam / sqrt(n);  # lambdas are passed a sqrt(n) free from python code
     soln = selectiveInference:::solve_problem_glmnet(X, y, lam, penalty_factor=penalty_factor, loss="ls")
