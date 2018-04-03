@@ -317,6 +317,16 @@ class liu_R_theory(liu_theory):
             return [np.nan], [np.nan] # some R failure occurred 
 liu_R_theory.register()
 
+class liu_R_aggressive(liu_R_theory):
+
+    method_name = "Liu + aggressive (R code)"
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+liu_R_aggressive.register()
+
 class lee_full_R_theory(liu_theory):
 
     method_name = "Lee + theory (R code)"
