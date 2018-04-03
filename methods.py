@@ -282,7 +282,9 @@ class liu_R_theory(liu_theory):
         rpy.r.assign('q', self.q)
         rpy.r.assign('lam', self.lagrange[0])
         rpy.r('''
-    sigma_est=selectiveInference:::estimate_sigma(X,y,coef(CV, s="lambda.min")[-1]) # sigma via Reid et al.
+    sigma_est=selectiveInference:::estimate_sigma(X,y,coef(CV, s="lambda.min"))[['sigmahat']] # sigma via Reid et al.
+    #print(sigma_est);
+    sigma_est = 1
     p = ncol(X);
     n = nrow(X);
     penalty_factor = rep(1, p);
@@ -306,6 +308,53 @@ class liu_R_theory(liu_theory):
             selected = []
         return selected, active_set
 liu_R_theory.register()
+
+class lee_full_R_theory(liu_theory):
+
+    method_name = "Lee + theory (R code)"
+
+    def select(self):
+        numpy2ri.activate()
+        rpy.r.assign('x', self.X)
+        rpy.r.assign('y', self.Y)
+        rpy.r('y = as.numeric(y)')
+        rpy.r.assign('q', self.q)
+        rpy.r.assign('lam', self.lagrange[0])
+        rpy.r('''
+    sigma_est = selectiveInference:::estimate_sigma(x,y,coef(CV, s="lambda.min"))[['sigmahat']] # sigma via Reid et al.
+    n = nrow(x);
+    gfit = glmnet(x, y, standardize=FALSE, intercept=FALSE)
+    lam = lam / sqrt(n);  # lambdas are passed a sqrt(n) free from python code
+    if (lam < max(abs(t(x) %*% y) / n)) {
+        beta = coef(gfit, x=x, y=y, s=lam, exact=TRUE)[-1]
+        out = fixedLassoInf(x, y, beta, lam*n, sigma=sigma_est, type='full', intercept=FALSE)
+        active_vars=out$vars - 1 # for 0-based
+        pvalues = out$pv
+    } else {
+        pvalues = NULL
+        active_vars = numeric(0)
+    }
+    ''')
+
+        pvalues = np.asarray(rpy.r('pvalues'))
+        active_set = np.asarray(rpy.r('active_vars'))
+        numpy2ri.deactivate()
+        if len(active_set) > 0:
+            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+        else:
+            selected = []
+        return selected, active_set
+lee_full_R_theory.register()
+
+class lee_full_R_aggressive(lee_full_R_theory):
+
+    method_name = "Lee + theory (R code)"
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+lee_full_R_aggressive.register()
 
 # Unrandomized selected
 
