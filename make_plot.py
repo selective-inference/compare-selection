@@ -53,6 +53,8 @@ def make_plot_signal_fixed(csvfile,
         ax = fig.gca()
     for method in methods:
         df_ = df[df['Method'] == method]
+        print(method)
+        print(df_)
         if len(df_) > 0:
             ax.plot(df_['rho'], df_[metric], 'o--', label=method)
             print(method)
