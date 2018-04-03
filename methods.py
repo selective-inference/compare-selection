@@ -282,9 +282,9 @@ class liu_R_theory(liu_theory):
         rpy.r.assign('q', self.q)
         rpy.r.assign('lam', self.lagrange[0])
         rpy.r('''
-    sigma_est=selectiveInference:::estimate_sigma(X,y,coef(CV, s="lambda.min"))[['sigmahat']] # sigma via Reid et al.
-    #print(sigma_est);
-    sigma_est = 1
+    CV = cv.glmnet(X, y, standardize=FALSE, intercept=FALSE, family=selectiveInference:::family_label("ls"))
+    sigma_est=selectiveInference:::estimate_sigma(X,y,coef(CV, s="lambda.min")[-1])[['sigmahat']] # sigma via Reid et al.
+
     p = ncol(X);
     n = nrow(X);
     penalty_factor = rep(1, p);
@@ -321,7 +321,8 @@ class lee_full_R_theory(liu_theory):
         rpy.r.assign('q', self.q)
         rpy.r.assign('lam', self.lagrange[0])
         rpy.r('''
-    sigma_est = selectiveInference:::estimate_sigma(x,y,coef(CV, s="lambda.min"))[['sigmahat']] # sigma via Reid et al.
+    CV = cv.glmnet(x, y, standardize=FALSE, intercept=FALSE, family=selectiveInference:::family_label("ls"))
+    sigma_est=selectiveInference:::estimate_sigma(x,y,coef(CV, s="lambda.min")[-1])[['sigmahat']] # sigma via Reid et al.
     n = nrow(x);
     gfit = glmnet(x, y, standardize=FALSE, intercept=FALSE)
     lam = lam / sqrt(n);  # lambdas are passed a sqrt(n) free from python code
