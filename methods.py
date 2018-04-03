@@ -707,3 +707,40 @@ class randomized_lasso_full_aggressive_half(randomized_lasso_full_aggressive):
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 randomized_lasso_full_aggressive.register(), randomized_lasso_full_aggressive_half.register()
+
+class randomized_lasso_R_theory(randomized_lasso):
+
+    method_name = "Randomized LASSO + theory (R code, selected)"
+
+    def select(self):
+        numpy2ri.activate()
+        rpy.r.assign('X', self.X)
+        rpy.r.assign('y', self.Y)
+        rpy.r('y = as.numeric(y)')
+        rpy.r.assign('q', self.q)
+        rpy.r.assign('lam', self.lagrange[0])
+        rpy.r('''
+        n = nrow(X)
+        p = ncol(X)
+        lam = lam * sqrt(n)
+        result = randomizedLasso(X, y, lam, ridge_term=sd(y) * sqrt(n), 
+                                 noise_scale = sd(y) * 0.5 * sqrt(n), family='gaussian')
+        active_set = result$active_set
+        sigma_est = sigma(lm(y ~ X[,active_set] - 1))
+        targets = selectiveInference:::compute_target(result, 'partial', sigma_est = sigma_est, 
+                                 construct_pvalues=rep(TRUE, length(active_set)), 
+                                 construct_ci=rep(FALSE, length(active_set)))
+        out = randomizedLassoInf(result,
+                                 targets=targets)
+        pvalues = out$pvalues
+        ''')
+
+        pvalues = np.asarray(rpy.r('pvalues'))
+        active_set = np.asarray(rpy.r('active_set'))
+        numpy2ri.deactivate()
+        if len(active_set) > 0:
+            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+        else:
+            selected = []
+        return selected, active_set
+randomized_lasso_R_theory.register()
