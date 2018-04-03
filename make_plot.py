@@ -1,3 +1,5 @@
+import os
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -69,7 +71,7 @@ def make_plot_signal_fixed(csvfile,
 
     return ax, fig
 
-def signal_plot(csvfile, rho=0.25, methods=[]):
+def signal_plot(csvfile, outbase, rho=0.25, methods=[]):
 
     fig = plt.figure(num=1, figsize=(12, 5))
     fig.clf()
@@ -81,10 +83,10 @@ def signal_plot(csvfile, rho=0.25, methods=[]):
                                   ax=ax, methods=methods)
     ax.plot([3.5,5], [0.2, 0.2], 'k--', linewidth=2)
     ax.legend(loc='upper right', fontsize='xx-small')
-    fig.savefig(csvfile[:-4] + '_rho%0.2f.pdf' % rho)
-    fig.savefig(csvfile[:-4] + '_rho%0.2f.png' % rho)
+    fig.savefig(outbase + '_rho%0.2f.pdf' % rho)
+    fig.savefig(outbase + '_rho%0.2f.png' % rho)
 
-def rho_plot(csvfile, signal=4, methods=[]):
+def rho_plot(csvfile, outbase, signal=4, methods=[]):
 
     fig = plt.figure(num=1, figsize=(10, 5))
     fig.clf()
@@ -96,19 +98,21 @@ def rho_plot(csvfile, signal=4, methods=[]):
                                      ax=ax, methods=methods)
     ax.plot([0, 0.75], [0.2, 0.2], 'k--', linewidth=2)
     ax.legend(loc='upper right', fontsize='xx-small')
-    fig.savefig(csvfile[:-4] + '_signal%0.1f.pdf' % signal)
-    fig.savefig(csvfile[:-4] + '_signal%0.1f.png' % signal)
+    fig.savefig(outbase + '_signal%0.1f.pdf' % signal)
+    fig.savefig(outbase + '_signal%0.1f.png' % signal)
 
 def main(opts):
 
     method_names = [methods[n].method_name for n in opts.methods]
     
+    outbase = opts.outbase or os.path.splitext(opts.csvfile)[0]
+
     if opts.rho:
         for rho in np.atleast_1d(opts.rho):
-            signal_plot(opts.csvfile, rho=rho, methods=method_names)
+            signal_plot(opts.csvfile, rho=rho, methods=method_names, outbase=outbase)
     if opts.signal:
         for signal in np.atleast_1d(opts.signal):
-            rho_plot(opts.csvfile, signal=signal, methods=method_names)
+            rho_plot(opts.csvfile, signal=signal, methods=method_names, outbase=outbase)
 
 if __name__ == "__main__":
 
@@ -133,6 +137,7 @@ Try:
                         help='Make a plot with signal on x-axis for fixed rho')
     parser.add_argument('--csvfile', help='CSV file to store results looped over (signal, rho).',
                         dest='csvfile')
+    parser.add_argument('--outbase', help='Begginning of name of pdf / png files where results are plotted. Defaults to the base of csvfile.')
 
     opts = parser.parse_args()
 
