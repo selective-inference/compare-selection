@@ -733,6 +733,7 @@ class randomized_lasso_R_theory(randomized_lasso):
         out = randomizedLassoInf(result,
                                  targets=targets)
         pvalues = out$pvalues
+        active_set = active_set - 1
         ''')
 
         pvalues = np.asarray(rpy.r('pvalues'))
