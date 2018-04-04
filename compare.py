@@ -71,9 +71,15 @@ def compare(instance,
                     f.write(instance.params.to_html())
                     f.close()
 
-                if htmlfile is not None:
+                if csvfile is not None:
+
+                    df_cp = copy(df)
+                    param = instance.params
+                    for col in param.columns:
+                        df_cp[col] = param[col][0] 
+                    df_cp['distance_tol'] = instance.distance_tol
                     f = open(csvfile, 'w')
-                    f.write(df.to_csv(index=False) + '\n')
+                    f.write(df_cp.to_csv(index=False) + '\n')
                     f.close()
 
     big_df = copy(df)
