@@ -210,7 +210,7 @@ knockoffs_fixed.register()
 class liu_theory(generic_method):
 
     method_name = "Liu + theory (full)"            
-    sigma_estimator = 'reid'
+    sigma_estimator = 'pearson'
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -226,7 +226,7 @@ class liu_theory(generic_method):
         L.fit()
 
         if len(L.active) > 0:
-            if self.sigma_estimator == 'reid':
+            if self.sigma_estimator == 'reid' and n < p:
                 dispersion = self.sigma_reid**2
             else:
                 dispersion = None
@@ -250,14 +250,20 @@ class liu_aggressive(liu_theory):
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
-
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 liu_aggressive.register()
 
+class liu_aggressive_reid(liu_aggressive):
+
+    method_name = "Liu + theory, aggressive, Reid (full)"            
+    sigma_estimator = 'reid'
+    pass
+liu_aggressive_reid.register()
+
 class liu_CV(liu_theory):
             
-    method_name = "Liu + CV (full)" 
+    method_name = "Liu + Reid (full)" 
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
