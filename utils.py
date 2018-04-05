@@ -78,10 +78,10 @@ class equicor_instance(data_instance):
         self.signal = self.signal_fac * self.fixed_l_theory
 
     @property
-    def sigma(self):
+    def feature_cov(self):
         if not hasattr(self, "_sigma"):
-            self._sigma = np.ones((self.p, self.p)) * self.rho + (1 - self.rho) * np.identity(self.p)
-        return self._sigma
+            self._feature_cov = np.ones((self.p, self.p)) * self.rho + (1 - self.rho) * np.identity(self.p)
+        return self._feature_cov
 
     @property
     def params(self):
@@ -178,11 +178,11 @@ class mixed_instance(equicor_instance):
         return X, Y, beta
 
     @property
-    def sigma(self):
+    def feature_cov(self):
         if not hasattr(self, "_sigma"):
-            self._sigma = 0.5 * (self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p))) + 
+            self._feature_cov = 0.5 * (self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p))) + 
                                  np.ones((self.p, self.p)) * self.equicor_rho + (1 - self.equicor_rho) * np.identity(self.p))
-        return self._sigma
+        return self._feature_cov
 
 mixed_instance.register()
 
@@ -225,14 +225,21 @@ class AR_instance(equicor_instance):
         return X, Y, beta
 
     @property
-    def sigma(self):
+    def feature_cov(self):
         if not hasattr(self, "_sigma"):
-            self._sigma = self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p)))
-        return self._sigma
+            self._feature_cov = self.rho**np.fabs(np.subtract.outer(np.arange(self.p), np.arange(self.p)))
+        return self._feature_cov
 
 AR_instance.register()
 
-def lagrange_vals(X, Y, run_CV=True):
+def gaussian_setup(X, Y, run_CV=True):
+    """
+
+    Some calculations that can be reused by methods:
+    
+    lambda.min, lambda.1se, lambda.theory and Reid et al. estimate of noise
+
+    """
     n, p = X.shape
 
     Xn = X / np.sqrt((X**2).sum(0))[None, :] 
@@ -246,14 +253,16 @@ def lagrange_vals(X, Y, run_CV=True):
         rpy.r('X=as.matrix(X)')
         rpy.r('Y=as.numeric(Y)')
         rpy.r('G = cv.glmnet(X, Y, intercept=FALSE, standardize=FALSE)')
+        rpy.r('sigma_reid = selectiveInference:::estimate_sigma(X, Y, coef(G, s="lambda.min")[-1]) # sigma via Reid et al.')
         rpy.r("L = G[['lambda.min']]")
         rpy.r("L1 = G[['lambda.1se']]")
         L = rpy.r('L')
         L1 = rpy.r('L1')
+        sigma_reid = rpy.r('sigma_reid')[0]
         numpy2ri.deactivate()
-        return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory 
+        return L * np.sqrt(X.shape[0]), L1 * np.sqrt(X.shape[0]), l_theory, sigma_reid
     else:
-        return None, None, l_theory
+        return None, None, l_theory, None
 
 def BHfilter(pval, q=0.2):
     numpy2ri.activate()

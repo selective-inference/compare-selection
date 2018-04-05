@@ -6,7 +6,7 @@ import time
 import numpy as np
 import pandas as pd
 
-from utils import data_instances, lagrange_vals
+from utils import data_instances, gaussian_setup
 from methods import methods
 
 import knockoff_phenom # more instances
@@ -22,16 +22,18 @@ def compare(instance,
     
     results = [[] for m in methods]
     
-    run_CV = np.any(['CV' in str(m) for m in methods] + ['1se' in str(m) for m in methods])
+    run_CV = (np.any(['CV' in str(m) for m in methods] + ['1se' in str(m) for m in methods]) or 
+              np.any([(hasattr(m, 'sigma_estimator') and m.sigma_estimator == 'reid') 
+                      for m in methods]))
 
     if method_setup:
         for method in methods:
-            method.setup(instance.sigma)
+            method.setup(instance.feature_cov)
 
     for i in range(nsim):
 
         X, Y, beta = instance.generate()
-        l_min, l_1se, l_theory = lagrange_vals(X.copy(), Y.copy(), run_CV=run_CV)
+        l_min, l_1se, l_theory, sigma_reid = gaussian_setup(X.copy(), Y.copy(), run_CV=run_CV)
         true_active = np.nonzero(beta)[0]
 
         def summary(result):
@@ -48,7 +50,7 @@ def compare(instance,
 
         for method, result in zip(methods, results):
             toc = time.time()
-            M = method(X.copy(), Y.copy(), l_theory, l_min, l_1se)
+            M = method(X.copy(), Y.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
             M.q = q
             selected, active = M.select()
             tic = time.time()
