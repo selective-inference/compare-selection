@@ -217,12 +217,12 @@ class liu_theory(generic_method):
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
-    def select(self):
+    def select(self, constructor=lasso_full.gaussian):
 
         X, Y, lagrange = self.X, self.Y, self.lagrange
         n, p = X.shape
 
-        L = lasso_full.gaussian(X, Y, lagrange * np.sqrt(n))
+        L = constructor(X, Y, lagrange * np.sqrt(n))
         L.fit()
 
         if len(L.active) > 0:
@@ -392,12 +392,12 @@ class lee_theory(generic_method):
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
-    def select(self):
+    def select(self, constructor=lasso.gaussian):
 
         X, Y, lagrange = self.X, self.Y, self.lagrange
         n, p = X.shape
         X = X / np.sqrt(n)
-        L = lasso.gaussian(X, Y, lagrange)
+        L = constructor(X, Y, lagrange)
         L.fit()
         if len(L.active) > 0:
             S = L.summary(compute_intervals=False, alternative='onesided')
@@ -492,16 +492,16 @@ class randomized_lasso(generic_method):
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
-    def select(self):
+    def select(self, constructor=highdim.gaussian):
         X, Y, lagrange = self.X, self.Y, self.lagrange
 
         n, p = X.shape
         X = X / np.sqrt(n)
 
-        rand_lasso = highdim.gaussian(X,
-                                      Y,
-                                      lagrange,
-                                      randomizer_scale=self.randomizer_scale * np.std(Y))
+        rand_lasso = constructor(X,
+                                 Y,
+                                 lagrange,
+                                 randomizer_scale=self.randomizer_scale * np.std(Y))
 
         signs = rand_lasso.fit()
         active_set = np.nonzero(signs)[0]
