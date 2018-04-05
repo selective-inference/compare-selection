@@ -227,7 +227,10 @@ class liu_theory(generic_method):
 
         if len(L.active) > 0:
             if self.sigma_estimator == 'reid':
-                S = L.summary(compute_intervals=False, dispersion=self.sigma_reid**2)
+                dispersion = self.sigma_reid**2
+            else:
+                dispersion = None
+            S = L.summary(compute_intervals=False, dispersion=dispersion)
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
 
