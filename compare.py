@@ -176,6 +176,7 @@ Try:
     python compare.py --instance indep_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile indep.html --csvfile indep.csv
 ''')
     parser.add_argument('--instance',
+                        default='AR_instance',
                         dest='instance', help='Which instance to generate data from -- only one choice. To see choices run --list_instances.')
     parser.add_argument('--list_instances',
                         dest='list_instances', action='store_true')
