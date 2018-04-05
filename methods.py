@@ -207,23 +207,50 @@ knockoffs_fixed.register()
 
 # Liu, Markovic, Tibs selection
 
-class liu_theory(generic_method):
+class pvalue_method(generic_method):
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        self._fit = False
+
+    def select(self):
+
+        if not self._fit:
+            self.method_instance.fit()
+            self._fit = True
+
+        active_set, pvalues = self.generate_pvalues()
+        if len(pvalues) > 0:
+            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            return selected, active_set
+        else:
+            return [], active_set
+
+class liu_theory(pvalue_method):
 
     method_name = "Liu + theory (full)"            
     sigma_estimator = 'pearson'
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
-    def select(self, constructor=lasso_full.gaussian):
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = lasso_full.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
+        return self._method_instance
 
-        X, Y, lagrange = self.X, self.Y, self.lagrange
+    def generate_pvalues(self): 
+
+        if not self._fit:
+            self.method_instance.fit()
+            self._fit = True
+
+        X, Y, lagrange, L = self.X, self.Y, self.lagrange, self.method_instance
         n, p = X.shape
-
-        L = constructor(X, Y, lagrange * np.sqrt(n))
-        L.fit()
 
         if len(L.active) > 0:
             if self.sigma_estimator == 'reid' and n < p:
@@ -233,14 +260,10 @@ class liu_theory(generic_method):
             S = L.summary(compute_intervals=False, dispersion=dispersion)
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
-
-            if len(pvalues) > 0:
-                selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
-            else:
-                selected = []
+            return active_set, pvalues
         else:
-            selected, active_set = [], []
-        return selected, active_set
+            return [], []
+
 liu_theory.register()
 
 class liu_aggressive(liu_theory):
@@ -249,7 +272,7 @@ class liu_aggressive(liu_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        liu_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 liu_aggressive.register()
@@ -267,7 +290,7 @@ class liu_CV(liu_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        liu_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_min * np.ones(X.shape[1])
 liu_CV.register()
 
@@ -277,16 +300,15 @@ class liu_1se(liu_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        liu_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_1se * np.ones(X.shape[1])
-
 liu_1se.register()
 
 class liu_R_theory(liu_theory):
 
     method_name = "Liu + theory (R code)"
 
-    def select(self):
+    def generate_pvalues(self):
         if True: #try:
             numpy2ri.activate()
             rpy.r.assign('X', self.X)
@@ -322,10 +344,9 @@ class liu_R_theory(liu_theory):
             active_set = np.asarray(rpy.r('active_vars'))
             numpy2ri.deactivate()
             if len(active_set) > 0:
-                selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+                return active_set, pvalues
             else:
-                selected = []
-            return selected, active_set
+                return [], []
         else: # except:
             return [np.nan], [np.nan] # some R failure occurred 
 liu_R_theory.register()
@@ -336,7 +357,7 @@ class liu_R_aggressive(liu_R_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        liu_R_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 liu_R_aggressive.register()
 
@@ -344,7 +365,7 @@ class lee_full_R_theory(liu_theory):
 
     method_name = "Lee + theory (R code)"
 
-    def select(self):
+    def generate_pvalues(self):
         numpy2ri.activate()
         rpy.r.assign('x', self.X)
         rpy.r.assign('y', self.Y)
@@ -371,10 +392,9 @@ class lee_full_R_theory(liu_theory):
         active_set = np.asarray(rpy.r('active_vars'))
         numpy2ri.deactivate()
         if len(active_set) > 0:
-            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            return active_set, pvalues
         else:
-            selected = []
-        return selected, active_set
+            return [], []
 lee_full_R_theory.register()
 
 class lee_full_R_aggressive(lee_full_R_theory):
@@ -383,41 +403,43 @@ class lee_full_R_aggressive(lee_full_R_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        lee_full_R_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 lee_full_R_aggressive.register()
 
 # Unrandomized selected
 
-class lee_theory(generic_method):
+class lee_theory(pvalue_method):
     
     method_name = "Lee et al. + theory (selected)"
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
-    def select(self, constructor=lasso.gaussian):
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = lasso.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
+        return self._method_instance
 
-        X, Y, lagrange = self.X, self.Y, self.lagrange
-        n, p = X.shape
-        X = X / np.sqrt(n)
-        L = constructor(X, Y, lagrange)
-        L.fit()
+    def generate_pvalues(self):
+
+        if not self._fit:
+            self.method_instance.fit()
+            self._fit = True
+
+        X, Y, lagrange, L = self.X, self.Y, self.lagrange, self.method_instance
+
         if len(L.active) > 0:
             S = L.summary(compute_intervals=False, alternative='onesided')
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
-
-            if len(pvalues) > 0:
-                selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
-            else:
-                selected = []
+            return active_set, pvalues
         else:
-            selected, active_set = [], []
-        return selected, active_set
-
+            return [], []
 lee_theory.register()
 
 class lee_CV(lee_theory):
@@ -426,7 +448,7 @@ class lee_CV(lee_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        lee_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_min * np.ones(X.shape[1])
 
 lee_CV.register()
@@ -437,7 +459,7 @@ class lee_1se(lee_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        lee_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
 lee_1se.register()
@@ -448,44 +470,44 @@ class lee_aggressive(lee_theory):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        lee_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = 0.8 * l_theory * np.ones(X.shape[1])
 
 lee_aggressive.register()
 
-class sqrt_lasso(generic_method):
+class sqrt_lasso(pvalue_method):
 
     method_name = 'SqrtLASSO, kappa=0.7 (selected)'
     kappa = 0.7
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = self.kappa * choose_lambda(X)
 
-    def select(self):
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            self._method_instance = lasso.sqrt_lasso(self.X, self.Y, self.lagrange * np.sqrt(n))
+        return self._method_instance
 
-        X, Y, lagrange = self.X, self.Y, self.lagrange
+    def generate_pvalues(self):
+
+        X, Y, lagrange, L = self.X, self.Y, self.lagrange, self.method_instance
         n, p = X.shape
         X = X / np.sqrt(n)
-        L = lasso.sqrt_lasso(X, Y, lagrange)
-        L.fit()
+
         if len(L.active) > 0:
             S = L.summary(compute_intervals=False, alternative='onesided')
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
-
-            if len(pvalues) > 0:
-                selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
-            else:
-                selected = []
+            return active_set, pvalues
         else:
-            selected, active_set = [], []
-        return selected, active_set
+            return [], []
 
 # Randomized selected
 
-class randomized_lasso(generic_method):
+class randomized_lasso(pvalue_method):
 
     method_name = "Randomized LASSO + theory (selected)"
     target = 'selected'
@@ -495,19 +517,26 @@ class randomized_lasso(generic_method):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
-    def select(self, constructor=highdim.gaussian):
-        X, Y, lagrange = self.X, self.Y, self.lagrange
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = highdim.gaussian(self.X,
+                                                     self.Y,
+                                                     self.lagrange * np.sqrt(n),
+                                                     randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
+        return self._method_instance
 
+    def generate_pvalues(self):
+        X, Y, lagrange, rand_lasso = self.X, self.Y, self.lagrange, self.method_instance
         n, p = X.shape
-        X = X / np.sqrt(n)
 
-        rand_lasso = constructor(X,
-                                 Y,
-                                 lagrange,
-                                 randomizer_scale=self.randomizer_scale * np.std(Y))
+        if not self._fit:
+            signs = self.method_instance.fit()
+            self._fit = True
 
         signs = rand_lasso.fit()
         active_set = np.nonzero(signs)[0]
@@ -516,11 +545,10 @@ class randomized_lasso(generic_method):
                                            burnin=self.burnin,
                                            compute_intervals=False)
         if len(pvalues) > 0:
-            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            return active_set, pvalues
         else:
-            selected = []
+            return [], []
 
-        return selected, active_set
 
 class randomized_lasso_CV(randomized_lasso):
 
@@ -528,7 +556,7 @@ class randomized_lasso_CV(randomized_lasso):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_min * np.ones(X.shape[1])
 
 class randomized_lasso_1se(randomized_lasso):
@@ -537,7 +565,7 @@ class randomized_lasso_1se(randomized_lasso):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
 randomized_lasso.register(), randomized_lasso_CV.register(), randomized_lasso_1se.register()
@@ -554,7 +582,7 @@ class randomized_lasso_aggressive(randomized_lasso):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 class randomized_lasso_aggressive_half(randomized_lasso):
@@ -567,7 +595,7 @@ class randomized_lasso_aggressive_half(randomized_lasso):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 class randomized_lasso_aggressive_quarter(randomized_lasso):
@@ -580,7 +608,7 @@ class randomized_lasso_aggressive_quarter(randomized_lasso):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 randomized_lasso_aggressive.register(), randomized_lasso_aggressive_half.register(), randomized_lasso_aggressive_quarter.register()
@@ -608,7 +636,7 @@ class randomized_lasso_half_1se(randomized_lasso_1se):
 randomized_lasso_half.register(), randomized_lasso_half_CV.register(), randomized_lasso_half_1se.register()
 # Randomized sqrt selected
 
-class randomized_sqrtlasso(generic_method):
+class randomized_sqrtlasso(randomized_lasso):
 
     method_name = "Randomized SqrtLASSO, kappa=0.7, (selected)"
     randomizer_scale = 1
@@ -616,30 +644,37 @@ class randomized_sqrtlasso(generic_method):
     ndraw = 5000
     burnin = 1000
 
-    def select(self):
-        X, Y = self.X, self.Y
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            lagrange = np.ones(p) * choose_lambda(self.X) * self.kappa
+            self._method_instance = highdim.gaussian(self.X,
+                                                     self.Y,
+                                                     lagrange,
+                                                     randomizer_scale=self.randomizer_scale * np.std(self.Y))
+        return self._method_instance
+
+    def generate_pvalues(self):
+        X, Y, rand_lasso = self.X, self.Y, self.method_instance
         n, p = X.shape
         X = X / np.sqrt(n)
 
-        lagrange = np.ones(X.shape[1]) * choose_lambda(X) * self.kappa
+        if not self._fit:
+            self.method_instance.fit()
+            self._fit = True
 
-        rand_lasso = highdim.sqrt_lasso(X,
-                                        Y,
-                                        lagrange,
-                                        randomizer_scale=self.randomizer_scale / np.sqrt(n))
-
-        signs = rand_lasso.fit()
+        signs = self.method_instance.selection_variable['sign']
         active_set = np.nonzero(signs)[0]
         _, pvalues, _ = rand_lasso.summary(target="selected",
                                            ndraw=self.ndraw,
                                            burnin=self.burnin,
                                            compute_intervals=False)
         if len(pvalues) > 0:
-            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            return active_set, pvalues
         else:
-            selected = []
+            return [], []
 
-        return selected, active_set
 
 class randomized_sqrtlasso_half(randomized_sqrtlasso):
 
@@ -679,7 +714,7 @@ class randomized_lasso_full(randomized_lasso):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
 class randomized_lasso_full_CV(randomized_lasso_full):
@@ -688,7 +723,7 @@ class randomized_lasso_full_CV(randomized_lasso_full):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso_full.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_min * np.ones(X.shape[1])
 
 class randomized_lasso_full_1se(randomized_lasso_full):
@@ -697,7 +732,7 @@ class randomized_lasso_full_1se(randomized_lasso_full):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso_full.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_1se * np.ones(X.shape[1])
 
 randomized_lasso_full.register(), randomized_lasso_full_CV.register(), randomized_lasso_full_1se.register()
@@ -731,7 +766,7 @@ class randomized_lasso_full_aggressive(randomized_lasso_full):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso_full.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 class randomized_lasso_full_aggressive_half(randomized_lasso_full_aggressive):
@@ -741,7 +776,7 @@ class randomized_lasso_full_aggressive_half(randomized_lasso_full_aggressive):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        randomized_lasso_full.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
 randomized_lasso_full_aggressive.register(), randomized_lasso_full_aggressive_half.register()
@@ -750,7 +785,7 @@ class randomized_lasso_R_theory(randomized_lasso):
 
     method_name = "Randomized LASSO + theory (R code, selected)"
 
-    def select(self):
+    def generate_pvalues(self):
         numpy2ri.activate()
         rpy.r.assign('X', self.X)
         rpy.r.assign('y', self.Y)
@@ -778,8 +813,7 @@ class randomized_lasso_R_theory(randomized_lasso):
         active_set = np.asarray(rpy.r('active_set'))
         numpy2ri.deactivate()
         if len(active_set) > 0:
-            selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            return active_set, pvalues
         else:
-            selected = []
-        return selected, active_set
+            return [], []
 randomized_lasso_R_theory.register()

@@ -113,6 +113,10 @@ def main(opts, clean=False):
 
     csvfiles = []
     results_dict = {}
+
+    if opts.all_methods:
+        new_opts.methods = sorted(methods.keys())
+
     for rho, signal in product(np.atleast_1d(opts.rho),
                                signal_vals):
 
@@ -215,6 +219,9 @@ Try:
                         dest='csvfile')
     parser.add_argument('--clean', help='Remove individual CSV files after termination?',
                         default=False)
+    parser.add_argument('--all_methods', help='Run all methods.',
+                        default=False,
+                        action='store_true')
 
     opts = parser.parse_args()
 
