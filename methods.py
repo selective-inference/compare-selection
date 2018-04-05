@@ -441,6 +441,36 @@ class lee_aggressive(lee_theory):
 
 lee_aggressive.register()
 
+class sqrt_lasso(generic_method):
+
+    method_name = 'SqrtLASSO, kappa=0.7 (selected)'
+    kappa = 0.7
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se):
+
+        generic_method.__init__(self, X, Y, l_theory, l_min, l_1se)
+        self.lagrange = self.kappa * choose_lambda(X)
+
+    def select(self):
+
+        X, Y, lagrange = self.X, self.Y, self.lagrange
+        n, p = X.shape
+        X = X / np.sqrt(n)
+        L = lasso.sqrt_lasso(X, Y, lagrange)
+        L.fit()
+        if len(L.active) > 0:
+            S = L.summary(compute_intervals=False, alternative='onesided')
+            active_set = np.array(S['variable'])
+            pvalues = np.asarray(S['pval'])
+
+            if len(pvalues) > 0:
+                selected = [active_set[i] for i in BHfilter(pvalues, q=self.q)]
+            else:
+                selected = []
+        else:
+            selected, active_set = [], []
+        return selected, active_set
+
 # Randomized selected
 
 class randomized_lasso(generic_method):
