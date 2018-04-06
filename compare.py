@@ -7,7 +7,7 @@ import numpy as np
 import pandas as pd
 
 from utils import data_instances, gaussian_setup
-from methods import methods
+from gaussian_methods import methods
 
 import knockoff_phenom # more instances
 
@@ -114,7 +114,9 @@ def main(opts, clean=False):
     csvfiles = []
     results_dict = {}
 
-    if opts.all_methods:
+    if opts.all_methods_noR: # noR takes precedence if both are used
+        new_opts.methods = sorted([n for n, m in methods.items() if not m.selectiveR_method])
+    elif opts.all_methods:
         new_opts.methods = sorted(methods.keys())
 
     for rho, signal in product(np.atleast_1d(opts.rho),
@@ -220,6 +222,9 @@ Try:
     parser.add_argument('--clean', help='Remove individual CSV files after termination?',
                         default=False)
     parser.add_argument('--all_methods', help='Run all methods.',
+                        default=False,
+                        action='store_true')
+    parser.add_argument('--all_methods_noR', help='Run all methods except the R selectiveInference methods. Takes precendence over --all_methods when both used.',
                         default=False,
                         action='store_true')
 
