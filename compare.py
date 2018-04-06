@@ -31,6 +31,21 @@ def compare(instance,
         for method in methods:
             method.setup(instance.feature_cov)
 
+    # find all columns needed for output
+
+    colnames = []
+    for method in methods:
+        M = method(np.random.standard_normal((10,5)), np.random.standard_normal(10), np.nan, np.nan, np.nan, np.nan)
+        colnames += M.trait_names()
+    colnames = sorted(np.unique(colnames))
+
+    def get_col(method, colname):
+        if colname in method.trait_names():
+            return getattr(method, colname)
+
+    def get_cols(method):
+        return [get_col(method, colname) for colname in colnames]
+
     for i in range(nsim):
 
         X, Y, beta = instance.generate()
@@ -49,9 +64,13 @@ def compare(instance,
                     np.mean(result[:,3]),
                     np.mean(result[:,4])]
 
+        method_instances = []
         for method, result in zip(methods, results):
+            if verbose:
+                print('method:', method)
             toc = time.time()
             M = method(X.copy(), Y.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
+            method_instances.append(M)
             M.q = q
             selected, active = M.select()
             tic = time.time()
@@ -62,8 +81,8 @@ def compare(instance,
                 result.append((TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)))
 
             if i > 0:
-                df = pd.DataFrame([[m.method_name] + summary(r) for m, r in zip(methods, results)], 
-                                  columns=['Method', 'Replicates', 'Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
+                df = pd.DataFrame([get_cols(m) + summary(r) for m, r in zip(method_instances, results)], 
+                                  columns=colnames + ['Replicates', 'Full model power', 'SD(Full model power)', 'False discoveries', 'Full model FDR', 'SD(Full model FDR)', 'Time', 'Active'])
 
                 if verbose:
                     print(df[['Replicates', 'Full model power', 'Time']])

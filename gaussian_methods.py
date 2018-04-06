@@ -1,4 +1,13 @@
 import tempfile, os, glob
+from traitlets import (HasTraits, 
+                       Integer, 
+                       Unicode, 
+                       Float, 
+                       Integer, 
+                       Instance, 
+                       Dict, 
+                       default, 
+                       observe)
 
 import numpy as np
 import regreg.api as rr
@@ -17,11 +26,15 @@ from rpy2.robjects import numpy2ri
 
 methods = {}
 
-class generic_method(object):
+class generic_method(HasTraits):
 
-    q = 0.2
-    method_name = 'Generic method'
     selectiveR_method = False
+
+    # Traits
+
+    q = Float(0.2)
+    method_name = Unicode('Generic method')
+    model = Unicode()
 
     @classmethod
     def setup(cls, feature_cov):
@@ -51,7 +64,9 @@ class generic_method(object):
 
 class knockoffs_mf(generic_method):
 
-    method_name = 'ModelX Knockoffs  (full)'
+    method_name = Unicode('Knockoffs')
+    knockoff_method = Unicode('Second order')
+    model = Unicode("full")
 
     def select(self):
         try:
@@ -71,8 +86,10 @@ knockoffs_mf.register()
 
 class knockoffs_sigma(generic_method):
 
-    method_name = 'ModelX Knockoffs with Sigma, asdp, (full)'
     factor_method = 'asdp'
+    method_name = Unicode('Knockoffs')
+    knockoff_method = Unicode("ModelX (asdp)")
+    model = Unicode("full")
 
     @classmethod
     def setup(cls, feature_cov):
@@ -162,13 +179,16 @@ def factor_knockoffs(feature_cov, method='asdp'):
 
 class knockoffs_sigma_equi(knockoffs_sigma):
 
-    method_name = 'ModelX Knockoffs with Sigma, equi, (full)'
+    knockoff_method = Unicode('ModelX (equi)')
     factor_method = 'equi'
 
 knockoffs_sigma_equi.register()
 
 class knockoffs_orig(generic_method):
-    method_name = 'Candes & Barber (full)'
+
+    method_name = Unicode("Knockoffs")
+    knockoff_method = Unicode('Candes & Barber')
+    model = Unicode('full')
 
     def select(self):
         try:
@@ -189,7 +209,9 @@ knockoffs_orig.register()
 
 class knockoffs_fixed(generic_method):
 
-    method_name = 'Knockoffs fixed (full)'
+    method_name = Unicode("Knockoffs")
+    knockoff_method = Unicode('Fixed')
+    model = Unicode('full')
 
     def select(self):
         try:
@@ -230,8 +252,11 @@ class pvalue_method(generic_method):
 
 class liu_theory(pvalue_method):
 
-    method_name = "Liu + theory (full)"            
-    sigma_estimator = 'pearson'
+    sigma_estimator = Unicode('relaxed')
+
+    method_name = Unicode("Liu")
+    lambda_choice = Unicode("theory")
+    model = Unicode("full")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -270,7 +295,7 @@ liu_theory.register()
 
 class liu_aggressive(liu_theory):
 
-    method_name = "Liu + theory, aggressive (full)"            
+    lambda_choice = Unicode("aggressive")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -279,37 +304,48 @@ class liu_aggressive(liu_theory):
 
     def generate_pvalues(self):
         pval = liu_theory.generate_pvalues(self)
-        print(self.__class__, self.method_instance._pearson_sigma)
         return pval
 
 liu_aggressive.register()
 
 class liu_modelX_aggressive(liu_aggressive):
 
-    method_name = "Liu + modelX + theory, aggressive (full)"            
+    method_name = Unicode("Liu (ModelX)")
 
     @property
     def method_instance(self):
         if not hasattr(self, "_method_instance"):
             n, p = self.X.shape
-            print(np.diag(self.X.T.dot(self.X))[:10], 'empirical')
-            print(np.diag(n * self.feature_cov)[:10])
             self._method_instance = lasso_full_modelX(self.feature_cov * n, self.X, self.Y, self.lagrange * np.sqrt(n))
         return self._method_instance
-
-
 liu_modelX_aggressive.register()
+
+class liu_sparseinv_aggressive(liu_aggressive):
+
+    method_name = Unicode("Liu (debiased)")
+
+    """
+    Force the use of the debiasing matrix.
+    """
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = lasso_full.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
+            self._method_instance.sparse_inverse = True
+        return self._method_instance
+liu_sparseinv_aggressive.register()
 
 class liu_aggressive_reid(liu_aggressive):
 
-    method_name = "Liu + theory, aggressive, Reid (full)"            
-    sigma_estimator = 'reid'
+    sigma_estimator = Unicode('Reid')
     pass
 liu_aggressive_reid.register()
 
 class liu_CV(liu_theory):
             
-    method_name = "Liu + Reid (full)" 
+    lambda_choice = Unicode("CV")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -319,7 +355,7 @@ liu_CV.register()
 
 class liu_1se(liu_theory):
             
-    method_name = "Liu + 1SE (full)" 
+    lambda_choice = Unicode("1se")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -330,10 +366,10 @@ liu_1se.register()
 class liu_R_theory(liu_theory):
 
     selectiveR_method = True
-    method_name = "Liu + theory (R code)"
+    method_name = Unicode("Liu (R code)")
 
     def generate_pvalues(self):
-        if True: #try:
+        try:
             numpy2ri.activate()
             rpy.r.assign('X', self.X)
             rpy.r.assign('y', self.Y)
@@ -371,13 +407,13 @@ class liu_R_theory(liu_theory):
                 return active_set, pvalues
             else:
                 return [], []
-        else: # except:
+        except:
             return [np.nan], [np.nan] # some R failure occurred 
 liu_R_theory.register()
 
 class liu_R_aggressive(liu_R_theory):
 
-    method_name = "Liu + aggressive (R code)"
+    lambda_choice = Unicode('aggressive')
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -387,7 +423,7 @@ liu_R_aggressive.register()
 
 class lee_full_R_theory(liu_theory):
 
-    method_name = "Lee + theory (R code)"
+    method_name = Unicode("Lee (R code)")
     selectiveR_method = True
 
     def generate_pvalues(self):
@@ -424,7 +460,7 @@ lee_full_R_theory.register()
 
 class lee_full_R_aggressive(lee_full_R_theory):
 
-    method_name = "Lee + theory (R code)"
+    lambda_choice = Unicode("aggressive")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -436,7 +472,8 @@ lee_full_R_aggressive.register()
 
 class lee_theory(pvalue_method):
     
-    method_name = "Lee et al. + theory (selected)"
+    model = Unicode("selected")
+    method_name = Unicode("Lee")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -469,7 +506,7 @@ lee_theory.register()
 
 class lee_CV(lee_theory):
     
-    method_name = "Lee et al. + CV (selected)"
+    lambda_choice = Unicode("CV")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -480,7 +517,7 @@ lee_CV.register()
 
 class lee_1se(lee_theory):
     
-    method_name = "Lee et al. + 1SE (selected)"
+    lambda_choice = Unicode("1se")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -491,7 +528,7 @@ lee_1se.register()
 
 class lee_aggressive(lee_theory):
     
-    method_name = "Lee et al. + theory, aggressive (selected)"
+    lambda_choice = Unicode("aggressive")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -502,8 +539,8 @@ lee_aggressive.register()
 
 class sqrt_lasso(pvalue_method):
 
-    method_name = 'SqrtLASSO, kappa=0.7 (selected)'
-    kappa = 0.7
+    method_name = Unicode('SqrtLASSO')
+    kappa = Float(0.7)
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -534,9 +571,11 @@ class sqrt_lasso(pvalue_method):
 
 class randomized_lasso(pvalue_method):
 
-    method_name = "Randomized LASSO + theory (selected)"
-    target = 'selected'
-    randomizer_scale = 1
+    method_name = Unicode("Randomized LASSO")
+    model = Unicode("selected")
+    lambda_choice = Unicode("theory")
+    randomizer_scale = Float(1)
+
     ndraw = 5000
     burnin = 1000
 
@@ -565,7 +604,7 @@ class randomized_lasso(pvalue_method):
 
         signs = rand_lasso.fit()
         active_set = np.nonzero(signs)[0]
-        _, pvalues, _ = rand_lasso.summary(target=self.target,
+        _, pvalues, _ = rand_lasso.summary(target=self.model,
                                            ndraw=self.ndraw,
                                            burnin=self.burnin,
                                            compute_intervals=False)
@@ -577,7 +616,7 @@ class randomized_lasso(pvalue_method):
 
 class randomized_lasso_CV(randomized_lasso):
 
-    method_name = "Randomized LASSO + CV (selected)"
+    lambda_choice = Unicode("CV")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -586,7 +625,7 @@ class randomized_lasso_CV(randomized_lasso):
 
 class randomized_lasso_1se(randomized_lasso):
 
-    method_name = "Randomized LASSO + 1SE (selected)"
+    lambda_choice = Unicode("1se")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -599,11 +638,7 @@ randomized_lasso.register(), randomized_lasso_CV.register(), randomized_lasso_1s
 
 class randomized_lasso_aggressive(randomized_lasso):
 
-    method_name = "Randomized LASSO + theory, aggressive (selected)"
-
-    randomizer_scale = 1
-    ndraw = 5000
-    burnin = 1000
+    lambda_choice = Unicode("aggressive")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -612,11 +647,8 @@ class randomized_lasso_aggressive(randomized_lasso):
 
 class randomized_lasso_aggressive_half(randomized_lasso):
 
-    method_name = "Randomized LASSO + theory, aggressive, smaller noise (selected)"
+    randomizer_scale = Float(0.5)
 
-    randomizer_scale = 0.5
-    ndraw = 5000
-    burnin = 1000
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -625,11 +657,7 @@ class randomized_lasso_aggressive_half(randomized_lasso):
 
 class randomized_lasso_aggressive_quarter(randomized_lasso):
 
-    method_name = "Randomized LASSO + theory, aggressive, smaller noise (selected)"
-
-    randomizer_scale = 0.25
-    ndraw = 5000
-    burnin = 1000
+    randomizer_scale = Float(0.25)
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -642,20 +670,17 @@ randomized_lasso_aggressive.register(), randomized_lasso_aggressive_half.registe
 
 class randomized_lasso_half(randomized_lasso):
 
-    method_name = "Randomized LASSO + theory, smaller noise (selected)"
-    randomizer_scale = 0.5
+    randomizer_scale = Float(0.5)
     pass
 
 class randomized_lasso_half_CV(randomized_lasso_CV):
 
-    method_name = "Randomized LASSO + CV, smaller noise (selected)"
-    randomizer_scale = 0.5
+    randomizer_scale = Float(0.5)
     pass
 
 class randomized_lasso_half_1se(randomized_lasso_1se):
 
-    method_name = "Randomized LASSO + 1SE, smaller noise (selected)"
-    randomizer_scale = 0.5
+    randomizer_scale = Float(0.5)
     pass
 
 randomized_lasso_half.register(), randomized_lasso_half_CV.register(), randomized_lasso_half_1se.register()
@@ -663,11 +688,10 @@ randomized_lasso_half.register(), randomized_lasso_half_CV.register(), randomize
 
 class randomized_sqrtlasso(randomized_lasso):
 
-    method_name = "Randomized SqrtLASSO, kappa=0.7, (selected)"
-    randomizer_scale = 1
-    kappa = 0.7
-    ndraw = 5000
-    burnin = 1000
+    method_name = Unicode("Randomized SqrtLASSO")
+    model = Unicode("selected")
+    randomizer_scale = Float(1)
+    kappa = Float(0.7)
 
     @property
     def method_instance(self):
@@ -703,26 +727,20 @@ class randomized_sqrtlasso(randomized_lasso):
 
 class randomized_sqrtlasso_half(randomized_sqrtlasso):
 
-    method_name = "Randomized SqrtLASSO, kappa=0.7, smaller noise (selected)"
-    randomizer_scale = 0.5
-    kappa = 0.7
-
+    randomizer_scale = Float(0.5)
     pass
 
 randomized_sqrtlasso.register(), randomized_sqrtlasso_half.register()
 
 class randomized_sqrtlasso_bigger(randomized_sqrtlasso):
 
-    method_name = "Randomized SqrtLASSO, kappa=0.8 (selected)"
-    kappa = 0.8
-
+    kappa = Float(0.8)
     pass
 
 class randomized_sqrtlasso_bigger_half(randomized_sqrtlasso):
 
-    method_name = "Randomized SqrtLASSO, kappa=0.8, smaller noise (selected)"
-    kappa = 0.8
-    randomizer_scale = 0.5
+    kappa = Float(0.8)
+    randomizer_scale = Float(0.5)
     pass
 
 randomized_sqrtlasso_bigger.register(), randomized_sqrtlasso_bigger_half.register()
@@ -731,11 +749,7 @@ randomized_sqrtlasso_bigger.register(), randomized_sqrtlasso_bigger_half.registe
 
 class randomized_lasso_full(randomized_lasso):
 
-    method_name = 'Randomized LASSO + theory (full)'
-    randomizer_scale = 1
-    ndraw = 5000
-    burnin = 1000
-    target = 'full'
+    model = Unicode('full')
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -744,7 +758,7 @@ class randomized_lasso_full(randomized_lasso):
 
 class randomized_lasso_full_CV(randomized_lasso_full):
 
-    method_name = "Randomized LASSO + CV (full)"
+    lambda_choice = Unicode("CV")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -753,7 +767,7 @@ class randomized_lasso_full_CV(randomized_lasso_full):
 
 class randomized_lasso_full_1se(randomized_lasso_full):
 
-    method_name = "Randomized LASSO + 1SE (full)"
+    lambda_choice = Unicode("1se")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -766,19 +780,17 @@ randomized_lasso_full.register(), randomized_lasso_full_CV.register(), randomize
 
 class randomized_lasso_full_half(randomized_lasso_full):
 
-    method_name = "Randomized LASSO + theory, smaller noise (full)"
-    randomizer_scale = 0.5
+    randomizer_scale = Float(0.5)
+    pass
 
 class randomized_lasso_full_half_CV(randomized_lasso_full_CV):
 
-    method_name = "Randomized LASSO + CV, smaller noise (full)"
-    randomizer_scale = 0.5
+    randomizer_scale = Float(0.5)
     pass
 
 class randomized_lasso_full_half_1se(randomized_lasso_full_1se):
 
-    method_name = "Randomized LASSO + 1SE, smaller noise (full)"
-    randomizer_scale = 0.5
+    randomizer_scale = Float(0.5)
     pass
 
 randomized_lasso_full_half.register(), randomized_lasso_full_half_CV.register(), randomized_lasso_full_half_1se.register()
@@ -787,7 +799,7 @@ randomized_lasso_full_half.register(), randomized_lasso_full_half_CV.register(),
 
 class randomized_lasso_full_aggressive(randomized_lasso_full):
 
-    method_name = "Randomized LASSO + theory, aggressive, smaller noise (full)"
+    lambda_choice = Unicode("aggressive")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -796,19 +808,15 @@ class randomized_lasso_full_aggressive(randomized_lasso_full):
 
 class randomized_lasso_full_aggressive_half(randomized_lasso_full_aggressive):
 
-    method_name = "Randomized LASSO + theory, aggressive, smaller noise (full)"
-    randomizer_scale = 0.5
-
-    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
-
-        randomized_lasso_full.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
-        self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+    randomizer_scale = Float(0.5)
+    pass
 
 randomized_lasso_full_aggressive.register(), randomized_lasso_full_aggressive_half.register()
 
 class randomized_lasso_R_theory(randomized_lasso):
 
-    method_name = "Randomized LASSO + theory (R code, selected)"
+    method_name = Unicode("Randomized LASSO (R code)")
+    selective_Rcode = True
 
     def generate_pvalues(self):
         numpy2ri.activate()

@@ -3,7 +3,7 @@ import os
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from methods import methods
+from gaussian_methods import methods
 
 default_methods = [methods[n].method_name for n in ['knockoffs_sigma',
                                                     'knockoffs_sigma_equi',
