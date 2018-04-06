@@ -3,7 +3,7 @@ import tempfile, os, glob
 import numpy as np
 import regreg.api as rr
 
-from selection.algorithms.lasso import lasso, lasso_full
+from selection.algorithms.lasso import lasso, lasso_full, lasso_full_modelX
 from selection.algorithms.sqrt_lasso import choose_lambda
 from selection.truncated.gaussian import truncated_gaussian_old as TG
 from selection.randomized.lasso import highdim
@@ -21,10 +21,11 @@ class generic_method(object):
 
     q = 0.2
     method_name = 'Generic method'
+    selectiveR_method = False
 
     @classmethod
-    def setup(cls, sigma):
-        pass
+    def setup(cls, feature_cov):
+        cls.feature_cov = feature_cov
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
         (self.X,
@@ -74,8 +75,9 @@ class knockoffs_sigma(generic_method):
     factor_method = 'asdp'
 
     @classmethod
-    def setup(cls, sigma):
+    def setup(cls, feature_cov):
 
+        cls.feature_cov = feature_cov
         numpy2ri.activate()
 
         # see if we've factored this before
@@ -86,17 +88,17 @@ class knockoffs_sigma(generic_method):
         factors = glob.glob('.knockoff_factorizations/*npz')
         for factor_file in factors:
             factor = np.load(factor_file)
-            sigma_f = factor['sigma']
-            if ((sigma_f.shape == sigma.shape) and
+            feature_cov_f = factor['feature_cov']
+            if ((feature_cov_f.shape == feature_cov.shape) and
                 (factor['method'] == cls.factor_method) and
-                np.allclose(sigma_f, sigma)):
+                np.allclose(feature_cov_f, feature_cov)):
                 have_factorization = True
                 print('found factorization: %s' % factor_file)
                 cls.knockoff_chol = factor['knockoff_chol']
 
         if not have_factorization:
             print('doing factorization')
-            cls.knockoff_chol = factor_knockoffs(sigma, cls.factor_method)
+            cls.knockoff_chol = factor_knockoffs(feature_cov, cls.factor_method)
 
         numpy2ri.deactivate()
 
@@ -130,10 +132,10 @@ class knockoffs_sigma(generic_method):
 
 knockoffs_sigma.register()
 
-def factor_knockoffs(sigma, method='asdp'):
+def factor_knockoffs(feature_cov, method='asdp'):
 
     numpy2ri.activate()
-    rpy.r.assign('Sigma', sigma)
+    rpy.r.assign('Sigma', feature_cov)
     rpy.r.assign('method', method)
     rpy.r('''
 
@@ -153,7 +155,7 @@ def factor_knockoffs(sigma, method='asdp'):
     diag_s = np.asarray(rpy.r('diag_s'))
     np.savez('.knockoff_factorizations/%s.npz' % (os.path.split(tempfile.mkstemp()[1])[1],),
              method=method,
-             sigma=sigma,
+             feature_cov=feature_cov,
              knockoff_chol=knockoff_chol)
 
     return knockoff_chol
@@ -275,7 +277,28 @@ class liu_aggressive(liu_theory):
         liu_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
 
+    def generate_pvalues(self):
+        pval = liu_theory.generate_pvalues(self)
+        print(self.__class__, self.method_instance._pearson_sigma)
+        return pval
+
 liu_aggressive.register()
+
+class liu_modelX_aggressive(liu_aggressive):
+
+    method_name = "Liu + modelX + theory, aggressive (full)"            
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            print(np.diag(self.X.T.dot(self.X))[:10], 'empirical')
+            print(np.diag(n * self.feature_cov)[:10])
+            self._method_instance = lasso_full_modelX(self.feature_cov * n, self.X, self.Y, self.lagrange * np.sqrt(n))
+        return self._method_instance
+
+
+liu_modelX_aggressive.register()
 
 class liu_aggressive_reid(liu_aggressive):
 
@@ -306,6 +329,7 @@ liu_1se.register()
 
 class liu_R_theory(liu_theory):
 
+    selectiveR_method = True
     method_name = "Liu + theory (R code)"
 
     def generate_pvalues(self):
@@ -364,6 +388,7 @@ liu_R_aggressive.register()
 class lee_full_R_theory(liu_theory):
 
     method_name = "Lee + theory (R code)"
+    selectiveR_method = True
 
     def generate_pvalues(self):
         numpy2ri.activate()

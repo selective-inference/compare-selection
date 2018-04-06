@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 from selection.tests.instance import gaussian_instance
-from utils import data_instance
+from instances import data_instance
 
 class jelena_instance(data_instance):
 

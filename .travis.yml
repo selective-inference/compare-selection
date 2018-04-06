@@ -26,6 +26,7 @@ before_install:
 
 install:
   # Install selection
+  - pip install traitlets
   - git submodule update --init 
   - cd R-selective
   - git submodule update --init 
@@ -42,4 +43,5 @@ install:
 
 # command to run tests, e.g. python setup.py test
 script:
-    - python compare.py --instance AR_instance --nsample 100 --nfeature 50 --nsignal 10 --methods lee_theory liu_theory --htmlfile AR.html --signal 3 4 5 --rho 0 0.5 --csvfile AR.csv
+    - python compare.py --all_methods_noR --rho 0 0.3 --csvfile blah3.csv --nsample 100 --nfeature 50 --nsignal 10 --signal 4 3 --htmlfile blue.html --verbose --nsim 5
+    - python compare.py --all_methods_noR --rho 0 0.3 --csvfile blah3.csv --nsample 100 --nfeature 200 --nsignal 10 --signal 4 3 --htmlfile blue.html --verbose --nsim 5

@@ -144,7 +144,7 @@ class mixed_instance(equicor_instance):
                                  rho=rho)[0]
 
         X = np.sqrt(self.AR_weight) * X_AR + np.sqrt(1 - self.AR_weight) * X_equi
-        X /= np.sqrt((X**2).sum(0))[None, :] 
+        X /= np.sqrt((X**2).mean(0))[None, :] 
 
         return X
 

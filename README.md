@@ -5,6 +5,7 @@ To install
 ----------
 
 ```
+pip install traitlets
 git submodule update --init;
 cd R-selective;
 git submodule update --init;

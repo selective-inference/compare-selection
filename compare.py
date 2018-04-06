@@ -6,10 +6,11 @@ import time
 import numpy as np
 import pandas as pd
 
-from utils import data_instances, gaussian_setup
+from instances import data_instances
+from utils import gaussian_setup
 from gaussian_methods import methods
 
-import knockoff_phenom # more instances
+# import knockoff_phenom # more instances
 
 def compare(instance, 
             nsim=50, 
@@ -131,12 +132,8 @@ def main(opts, clean=False):
         new_opts.rho = rho
 
         _methods = [methods[n] for n in new_opts.methods]
-        _instance = data_instances[new_opts.instance]
-
-        if _instance.signature is None:
-            instance = _instance()
-        else:
-            instance = _instance(**dict([(n, getattr(new_opts, n)) for n in _instance.signature if hasattr(new_opts, n)]))
+        _instance = data_instances[new_opts.instance]()
+        instance = data_instances[new_opts.instance](**dict([(n, getattr(new_opts, n)) for n in _instance.trait_names() if hasattr(new_opts, n)]))
 
         if signal is not None: # here is where signal_fac can be ignored
             instance.signal = new_opts.signal_strength
