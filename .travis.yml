@@ -44,4 +44,4 @@ install:
 # command to run tests, e.g. python setup.py test
 script:
     - python compare.py --all_methods_noR --rho 0 0.3 --csvfile blah3.csv --nsample 100 --nfeature 50 --nsignal 10 --signal 4 3 --htmlfile blue.html --verbose --nsim 5
-    - python compare.py --all_methods_noR --rho 0 0.3 --csvfile blah3.csv --nsample 100 --nfeature 200 --nsignal 10 --signal 4 3 --htmlfile blue.html --verbose --nsim 5
+
