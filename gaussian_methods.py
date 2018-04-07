@@ -6,6 +6,7 @@ from traitlets import (HasTraits,
                        Integer, 
                        Instance, 
                        Dict, 
+                       Bool,
                        default, 
                        observe)
 
@@ -29,6 +30,7 @@ methods = {}
 class generic_method(HasTraits):
 
     selectiveR_method = False
+    wide_ok = True # ok for p>= n?
 
     # Traits
 
@@ -186,6 +188,8 @@ knockoffs_sigma_equi.register()
 
 class knockoffs_orig(generic_method):
 
+    wide_OK = False # requires at least n>p
+
     method_name = Unicode("Knockoffs")
     knockoff_method = Unicode('Candes & Barber')
     model = Unicode('full')
@@ -209,6 +213,8 @@ knockoffs_orig.register()
 
 class knockoffs_fixed(generic_method):
 
+    wide_OK = False # requires at least n>p
+
     method_name = Unicode("Knockoffs")
     knockoff_method = Unicode('Fixed')
     model = Unicode('full')
@@ -231,7 +237,7 @@ knockoffs_fixed.register()
 
 # Liu, Markovic, Tibs selection
 
-class pvalue_method(generic_method):
+class parametric_method(generic_method):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
@@ -250,17 +256,16 @@ class pvalue_method(generic_method):
         else:
             return [], active_set
 
-class liu_theory(pvalue_method):
+class liu_theory(parametric_method):
 
     sigma_estimator = Unicode('relaxed')
-
     method_name = Unicode("Liu")
     lambda_choice = Unicode("theory")
     model = Unicode("full")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        parametric_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     @property
@@ -329,21 +334,23 @@ class liu_modelQ_semi_aggressive(liu_aggressive):
     @classmethod
     def setup(cls, feature_cov):
         cls.feature_cov = feature_cov
-        _chol = np.linalg.cholesky(feature_cov)
-        p = feature_cov.shape[0]
-        Q = 0
-        batch_size = int(cls.B/10)
-        for _ in range(10):
-            X = np.random.standard_normal((batch_size, p)).dot(_chol.T)
-            Q += X.T.dot(X)
-        Q /= 10 * batch_size
-        cls._semi_supervised_Q = Q
+        cls._chol = np.linalg.cholesky(feature_cov)
 
     @property
     def method_instance(self):
         if not hasattr(self, "_method_instance"):
-            n, p = self.X.shape
-            self._method_instance = lasso_full_modelQ(self._semi_supervised_Q * n, self.X, self.Y, self.lagrange * np.sqrt(n))
+
+            # draw sample of X for semi-supervised method
+            _chol = cls._chol
+            p = _chol.shape[0]
+            Q = 0
+            batch_size = int(cls.B/10)
+            for _ in range(10):
+                X_semi = np.random.standard_normal((batch_size, p)).dot(_chol.T)
+                Q += X_semi.T.dot(X_semi)
+            Q += self.X.T.dot(self.X)
+            Q /= (10 * batch_size + self.X.shape[0])
+            self._method_instance = lasso_full_modelQ(Q * n, self.X, self.Y, self.lagrange * np.sqrt(n))
         return self._method_instance
 liu_modelQ_semi_aggressive.register()
 
@@ -450,6 +457,8 @@ liu_R_aggressive.register()
 
 class lee_full_R_theory(liu_theory):
 
+    wide_OK = False # requires at least n>p
+
     method_name = Unicode("Lee (R code)")
     selectiveR_method = True
 
@@ -497,14 +506,14 @@ lee_full_R_aggressive.register()
 
 # Unrandomized selected
 
-class lee_theory(pvalue_method):
+class lee_theory(parametric_method):
     
     model = Unicode("selected")
     method_name = Unicode("Lee")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        parametric_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     @property
@@ -564,14 +573,14 @@ class lee_aggressive(lee_theory):
 
 lee_aggressive.register()
 
-class sqrt_lasso(pvalue_method):
+class sqrt_lasso(parametric_method):
 
     method_name = Unicode('SqrtLASSO')
     kappa = Float(0.7)
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        parametric_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = self.kappa * choose_lambda(X)
 
     @property
@@ -596,7 +605,7 @@ class sqrt_lasso(pvalue_method):
 
 # Randomized selected
 
-class randomized_lasso(pvalue_method):
+class randomized_lasso(parametric_method):
 
     method_name = Unicode("Randomized LASSO")
     model = Unicode("selected")
@@ -608,7 +617,7 @@ class randomized_lasso(pvalue_method):
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
-        pvalue_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        parametric_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     @property
@@ -843,7 +852,7 @@ randomized_lasso_full_aggressive.register(), randomized_lasso_full_aggressive_ha
 class randomized_lasso_R_theory(randomized_lasso):
 
     method_name = Unicode("Randomized LASSO (R code)")
-    selective_Rcode = True
+    selective_Rmethod = True
 
     def generate_pvalues(self):
         numpy2ri.activate()
