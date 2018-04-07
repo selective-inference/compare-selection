@@ -138,6 +138,9 @@ def main(opts, clean=False):
         new_opts.methods = sorted([n for n, m in methods.items() if not m.selectiveR_method])
     elif opts.all_methods:
         new_opts.methods = sorted(methods.keys())
+    
+    if opts.wide_only: # only allow methods that are ok if p>n
+        new_opts.methods = [m for m in new_opts.methods if m.wide_OK]
 
     for rho, signal in product(np.atleast_1d(opts.rho),
                                signal_vals):
@@ -241,6 +244,9 @@ Try:
                         default=False,
                         action='store_true')
     parser.add_argument('--all_methods_noR', help='Run all methods except the R selectiveInference methods. Takes precendence over --all_methods when both used.',
+                        default=False,
+                        action='store_true')
+    parser.add_argument('--wide_only', help='Require methods that are OK for wide -- silently ignore other methods.',
                         default=False,
                         action='store_true')
 

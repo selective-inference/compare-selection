@@ -17,6 +17,7 @@ from selection.algorithms.lasso import lasso, lasso_full, lasso_full_modelQ
 from selection.algorithms.sqrt_lasso import choose_lambda
 from selection.truncated.gaussian import truncated_gaussian_old as TG
 from selection.randomized.lasso import highdim
+from selection.randomized.modelQ import modelQ as randomized_modelQ
 
 from utils import BHfilter
 
@@ -341,16 +342,17 @@ class liu_modelQ_semi_aggressive(liu_aggressive):
         if not hasattr(self, "_method_instance"):
 
             # draw sample of X for semi-supervised method
-            _chol = cls._chol
+            _chol = self._chol
             p = _chol.shape[0]
             Q = 0
-            batch_size = int(cls.B/10)
+            batch_size = int(self.B/10)
             for _ in range(10):
                 X_semi = np.random.standard_normal((batch_size, p)).dot(_chol.T)
                 Q += X_semi.T.dot(X_semi)
             Q += self.X.T.dot(self.X)
             Q /= (10 * batch_size + self.X.shape[0])
-            self._method_instance = lasso_full_modelQ(Q * n, self.X, self.Y, self.lagrange * np.sqrt(n))
+            n, p = self.X.shape
+            self._method_instance = lasso_full_modelQ(Q * self.X.shape[0], self.X, self.Y, self.lagrange * np.sqrt(n))
         return self._method_instance
 liu_modelQ_semi_aggressive.register()
 
@@ -720,6 +722,60 @@ class randomized_lasso_half_1se(randomized_lasso_1se):
     pass
 
 randomized_lasso_half.register(), randomized_lasso_half_CV.register(), randomized_lasso_half_1se.register()
+
+# Using modelQ for randomized
+
+class randomized_lasso_half_pop_1se(randomized_lasso_half_1se):
+
+    method_name = Unicode("Randomized ModelQ (pop)")
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = randomized_modelQ(self.feature_cov * n,
+                                                      self.X,
+                                                      self.Y,
+                                                      self.lagrange * np.sqrt(n),
+                                                      randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
+        return self._method_instance
+
+class randomized_lasso_half_semi_1se(randomized_lasso_half_1se):
+
+    method_name = Unicode("Randomized ModelQ (semi-supervised)")
+
+    B = 10000
+
+    @classmethod
+    def setup(cls, feature_cov):
+        cls.feature_cov = feature_cov
+        cls._chol = np.linalg.cholesky(feature_cov)
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+
+            # draw sample of X for semi-supervised method
+            _chol = self._chol
+            p = _chol.shape[0]
+            Q = 0
+            batch_size = int(self.B/10)
+            for _ in range(10):
+                X_semi = np.random.standard_normal((batch_size, p)).dot(_chol.T)
+                Q += X_semi.T.dot(X_semi)
+            Q += self.X.T.dot(self.X)
+            Q /= (10 * batch_size + self.X.shape[0])
+
+            n, p = self.X.shape
+            self._method_instance = randomized_modelQ(Q * n,
+                                                      self.X,
+                                                      self.Y,
+                                                      self.lagrange * np.sqrt(n),
+                                                      randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
+        return self._method_instance
+
+randomized_lasso_half_pop_1se.register(), randomized_lasso_half_semi_1se.register()
+
 # Randomized sqrt selected
 
 class randomized_sqrtlasso(randomized_lasso):
