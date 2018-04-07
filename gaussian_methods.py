@@ -310,7 +310,7 @@ liu_aggressive.register()
 
 class liu_modelQ_pop_aggressive(liu_aggressive):
 
-    method_name = Unicode("Liu (ModelX)")
+    method_name = Unicode("Liu (ModelQ population)")
 
     @property
     def method_instance(self):
@@ -322,7 +322,7 @@ liu_modelQ_pop_aggressive.register()
 
 class liu_modelQ_semi_aggressive(liu_aggressive):
 
-    method_name = Unicode("Liu (ModelX)")
+    method_name = Unicode("Liu (ModelQ semi-supervised)")
 
     B = 10000 # how many samples to use to estimate E[XX^T]
 
