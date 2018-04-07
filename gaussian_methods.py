@@ -12,7 +12,7 @@ from traitlets import (HasTraits,
 import numpy as np
 import regreg.api as rr
 
-from selection.algorithms.lasso import lasso, lasso_full, lasso_full_modelX
+from selection.algorithms.lasso import lasso, lasso_full, lasso_full_modelQ
 from selection.algorithms.sqrt_lasso import choose_lambda
 from selection.truncated.gaussian import truncated_gaussian_old as TG
 from selection.randomized.lasso import highdim
@@ -308,7 +308,7 @@ class liu_aggressive(liu_theory):
 
 liu_aggressive.register()
 
-class liu_modelX_aggressive(liu_aggressive):
+class liu_modelQ_pop_aggressive(liu_aggressive):
 
     method_name = Unicode("Liu (ModelX)")
 
@@ -316,9 +316,36 @@ class liu_modelX_aggressive(liu_aggressive):
     def method_instance(self):
         if not hasattr(self, "_method_instance"):
             n, p = self.X.shape
-            self._method_instance = lasso_full_modelX(self.feature_cov * n, self.X, self.Y, self.lagrange * np.sqrt(n))
+            self._method_instance = lasso_full_modelQ(self.feature_cov * n, self.X, self.Y, self.lagrange * np.sqrt(n))
         return self._method_instance
-liu_modelX_aggressive.register()
+liu_modelQ_pop_aggressive.register()
+
+class liu_modelQ_semi_aggressive(liu_aggressive):
+
+    method_name = Unicode("Liu (ModelX)")
+
+    B = 10000 # how many samples to use to estimate E[XX^T]
+
+    @classmethod
+    def setup(cls, feature_cov):
+        cls.feature_cov = feature_cov
+        _chol = np.linalg.cholesky(feature_cov)
+        p = feature_cov.shape[0]
+        Q = 0
+        batch_size = int(cls.B/10)
+        for _ in range(10):
+            X = np.random.standard_normal((batch_size, p)).dot(_chol.T)
+            Q += X.T.dot(X)
+        Q /= 10 * batch_size
+        cls._semi_supervised_Q = Q
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = lasso_full_modelQ(self._semi_supervised_Q * n, self.X, self.Y, self.lagrange * np.sqrt(n))
+        return self._method_instance
+liu_modelQ_semi_aggressive.register()
 
 class liu_sparseinv_aggressive(liu_aggressive):
 
