@@ -416,6 +416,23 @@ class liu_1se(liu_theory):
         self.lagrange = l_1se * np.ones(X.shape[1])
 liu_1se.register()
 
+class liu_sparseinv_1se(liu_1se):
+
+    method_name = Unicode("Liu (debiased)")
+
+    """
+    Force the use of the debiasing matrix.
+    """
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = lasso_full.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
+            self._method_instance.sparse_inverse = True
+        return self._method_instance
+liu_sparseinv_1se.register()
+
 class liu_R_theory(liu_theory):
 
     selectiveR_method = True
@@ -645,7 +662,7 @@ class sqrt_lasso(parametric_method):
     @property
     def method_instance(self):
         if not hasattr(self, "_method_instance"):
-            self._method_instance = lasso.sqrt_lasso(self.X, self.Y, self.lagrange * np.sqrt(n))
+            self._method_instance = lasso.sqrt_lasso(self.X, self.Y, self.lagrange)
         return self._method_instance
 
     def generate_summary(self, compute_intervals=False): 
@@ -675,6 +692,7 @@ class sqrt_lasso(parametric_method):
             return active_set, lower, upper
         else:
             return [], [], []
+sqrt_lasso.register()
 
 # Randomized selected
 
