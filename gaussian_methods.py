@@ -16,7 +16,7 @@ import regreg.api as rr
 from selection.algorithms.lasso import lasso, lasso_full, lasso_full_modelQ
 from selection.algorithms.sqrt_lasso import choose_lambda
 from selection.truncated.gaussian import truncated_gaussian_old as TG
-from selection.randomized.lasso import highdim
+from selection.randomized.lasso import lasso as random_lasso_method, form_targets
 from selection.randomized.modelQ import modelQ as randomized_modelQ
 
 from utils import BHfilter
@@ -626,13 +626,14 @@ class randomized_lasso(parametric_method):
     def method_instance(self):
         if not hasattr(self, "_method_instance"):
             n, p = self.X.shape
-            self._method_instance = highdim.gaussian(self.X,
-                                                     self.Y,
-                                                     self.lagrange * np.sqrt(n),
-                                                     randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
+            self._method_instance = random_lasso_method.gaussian(self.X,
+                                                                 self.Y,
+                                                                 self.lagrange * np.sqrt(n),
+                                                                 randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
         return self._method_instance
 
     def generate_pvalues(self):
+
         X, Y, lagrange, rand_lasso = self.X, self.Y, self.lagrange, self.method_instance
         n, p = X.shape
 
@@ -642,7 +643,19 @@ class randomized_lasso(parametric_method):
 
         signs = rand_lasso.fit()
         active_set = np.nonzero(signs)[0]
-        _, pvalues, _ = rand_lasso.summary(target=self.model,
+        active = signs != 0
+
+        (observed_target, 
+         cov_target, 
+         cov_target_score, 
+         alternatives) = form_targets(self.model,
+                                      rand_lasso.loglike,
+                                      rand_lasso._W,
+                                      active)
+        _, pvalues, _ = rand_lasso.summary(observed_target, 
+                                           cov_target, 
+                                           cov_target_score, 
+                                           alternatives,
                                            ndraw=self.ndraw,
                                            burnin=self.burnin,
                                            compute_intervals=False)
@@ -790,10 +803,10 @@ class randomized_sqrtlasso(randomized_lasso):
         if not hasattr(self, "_method_instance"):
             n, p = self.X.shape
             lagrange = np.ones(p) * choose_lambda(self.X) * self.kappa
-            self._method_instance = highdim.gaussian(self.X,
-                                                     self.Y,
-                                                     lagrange,
-                                                     randomizer_scale=self.randomizer_scale * np.std(self.Y))
+            self._method_instance = random_lasso_method.gaussian(self.X,
+                                                                 self.Y,
+                                                                 lagrange,
+                                                                 randomizer_scale=self.randomizer_scale * np.std(self.Y))
         return self._method_instance
 
     def generate_pvalues(self):
@@ -807,10 +820,24 @@ class randomized_sqrtlasso(randomized_lasso):
 
         signs = self.method_instance.selection_variable['sign']
         active_set = np.nonzero(signs)[0]
-        _, pvalues, _ = rand_lasso.summary(target="selected",
+        active = signs != 0
+
+
+        (observed_target, 
+         cov_target, 
+         cov_target_score, 
+         alternatives) = form_targets(self.model,
+                                      rand_lasso.loglike,
+                                      rand_lasso._W,
+                                      active)
+        _, pvalues, _ = rand_lasso.summary(observed_target, 
+                                           cov_target, 
+                                           cov_target_score, 
+                                           alternatives,
                                            ndraw=self.ndraw,
                                            burnin=self.burnin,
                                            compute_intervals=False)
+
         if len(pvalues) > 0:
             return active_set, pvalues
         else:
