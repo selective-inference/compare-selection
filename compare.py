@@ -32,7 +32,7 @@ def compare(instance,
             method.setup(instance.feature_cov)
         method.q = q
 
-    method_params, class_names = get_method_params(methods)
+    method_params, class_names, method_names = get_method_params(methods)
 
     for i in range(nsim):
 
@@ -48,7 +48,8 @@ def compare(instance,
                 df = summarize(method_params, summary, results)
                 for p in instance.params.columns:
                     df[p] = instance.params[p][0]
-                df['class name'] = class_names
+                df['class_name'] = class_names
+                df['method_name'] = method_names
                 if verbose:
                     print(df[summary(results[0]).columns])
 
@@ -82,13 +83,16 @@ def get_method_params(methods):
     def get_params(method):
         return [get_col(method, colname) for colname in colnames]
 
+    method_names = []
     method_params = []
     for method in methods:
         M = method(np.random.standard_normal((10,5)), np.random.standard_normal(10), 1., 1., 1., 1.)
         method_params.append(get_params(M))
+        method_names.append(M.method_name)
+
     method_params = pd.DataFrame(method_params, columns=colnames)
 
-    return method_params, [m.__name__ for m in methods]
+    return method_params, [m.__name__ for m in methods], method_names
 
 def summarize(method_params, summary, results):
     results_df = pd.concat([summary(r) for r in results])

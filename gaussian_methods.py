@@ -271,6 +271,9 @@ class liu_theory(parametric_method):
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
         parametric_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        n, p = X.shape
+        if n < p:
+            self.method_name = 'Liu (debiased)'
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     @property
