@@ -57,13 +57,17 @@ def compare(instance,
                 print('method:', method)
 
             result_df = statistic(method, instance, X.copy(), Y.copy(), beta.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
-            result_df['instance_id'] = instance_id
-            result_df['method_param'] = str(method_params.loc[idx])
-            result_df['method_name'] = method_name
-            result_df['class_name'] = class_name
-            
-            results.append(result_df)
-            if i > 0:
+
+            if result_df is not None:
+                result_df['instance_id'] = instance_id
+                result_df['method_param'] = str(method_params.loc[idx])
+                result_df['method_name'] = method_name
+                result_df['class_name'] = class_name
+                results.append(result_df)
+            else:
+                print('Result was empty.')
+
+            if i > 0 and len(results) > 0:
 
                 results_df = pd.concat(results)
 
@@ -245,7 +249,7 @@ Try:
                         dest='verbose')
     parser.add_argument('--htmlfile', help='HTML file to store results for one (signal, rho). When looping over (signal, rho) this HTML file tracks the current progress.',
                         dest='htmlfile')
-    parser.add_argument('--csvfile', help='CSV file to store results looped over (signal, rho).',
+    parser.add_argument('--csvfile', help='CSV file to store results looped over (signal, rho). Serves as a file base for individual (signal, rho) pairs.',
                         dest='csvfile')
     parser.add_argument('--all_methods', help='Run all methods.',
                         default=False,
@@ -262,6 +266,8 @@ Try:
                         type=float)
 
     opts = parser.parse_args()
+    if opts.csvfile is None:
+        raise ValueError('need a csvfile to store the results')
 
     results = main(opts)
 

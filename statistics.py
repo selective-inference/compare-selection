@@ -1,5 +1,33 @@
 import numpy as np, pandas as pd, time
 
+def pvalue_statistic(method, instance, X, Y, beta, l_theory, l_min, l_1se, sigma_reid):
+
+    toc = time.time()
+    M = method(X.copy(), Y.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
+
+    active, pvalues = M.generate_pvalues()
+    tic = time.time()
+
+    if len(active) > 0:
+        value = pd.DataFrame(pvalues, columns=['P-value'])
+        value['Time'] = tic-toc
+        return value
+
+def pvalue_summary(result):
+
+    value = pd.DataFrame([[np.mean(result['P-value']), 
+                           np.std(result['P-value'])]],
+                         columns=['P-value',
+                                  'SD(P-value)'])
+
+    # keep all things constant over groups
+
+    for n in result.columns:
+        if len(np.unique(result[n])) == 1:
+            value[n] = result[n].values[0]
+
+    return value
+
 def FDR_statistic(method, instance, X, Y, beta, l_theory, l_min, l_1se, sigma_reid):
     toc = time.time()
     M = method(X.copy(), Y.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
