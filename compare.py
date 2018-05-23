@@ -1,4 +1,4 @@
-import os
+import os, hashlib
 from copy import copy
 from itertools import product
 import time
@@ -7,7 +7,8 @@ import numpy as np
 import pandas as pd
 
 from instances import data_instances
-from utils import gaussian_setup
+from utils import gaussian_setup, summarize
+from statistics import FDR_statistic, FDR_summary
 from gaussian_methods import methods
 
 # import knockoff_phenom # more instances
@@ -23,7 +24,7 @@ def compare(instance,
             csvfile=None,
             q=0.2):
     
-    results = [[] for m in methods]
+    results = []
     
     run_CV = np.any([getattr(m, 'need_CV') for m in methods])
 
@@ -37,34 +38,55 @@ def compare(instance,
     for i in range(nsim):
 
         X, Y, beta = instance.generate()
+
+        # make a hash representing same data
+
+        instance_hash = hashlib.md5()
+        instance_hash.update(X.tobytes())
+        instance_hash.update(Y.tobytes())
+        instance_hash.update(beta.tobytes())
+        instance_id = instance_hash.digest()
+
         l_min, l_1se, l_theory, sigma_reid = gaussian_setup(X.copy(), Y.copy(), run_CV=run_CV)
 
-        for method, result in zip(methods, results):
+        for method, method_name, class_name, idx in zip(methods, 
+                                                        method_names,
+                                                        class_names,
+                                                        range(len(methods))):
             if verbose:
                 print('method:', method)
-            result.append(statistic(method, instance, X.copy(), Y.copy(), beta.copy(), l_theory.copy(), l_min, l_1se, sigma_reid))
 
+            result_df = statistic(method, instance, X.copy(), Y.copy(), beta.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
+            result_df['instance_id'] = instance_id
+            result_df['method_param'] = str(method_params.loc[idx])
+            result_df['method_name'] = method_name
+            result_df['class_name'] = class_name
+            
+            results.append(result_df)
             if i > 0:
-                df = summarize(method_params, summary, results)
-                for p in instance.params.columns:
-                    df[p] = instance.params[p][0]
-                df['class_name'] = class_names
-                df['method_name'] = method_names
-                if verbose:
-                    print(df[summary(results[0]).columns])
 
-                if htmlfile is not None:
-                    f = open(htmlfile, 'w')
-                    f.write(df.to_html() + '\n')
-                    f.write(instance.params.to_html())
-                    f.close()
+                results_df = pd.concat(results)
+
+                for p in instance.params.columns:
+                    results_df[p] = instance.params[p][0]
 
                 if csvfile is not None:
                     f = open(csvfile, 'w')
-                    f.write(df.to_csv(index_label=True) + '\n')
+                    f.write(results_df.to_csv(index_label=False) + '\n')
                     f.close()
 
-    return df, results
+                summary_df = summarize('method_param',
+                                       results_df,
+                                       summary)
+
+                for p in instance.params.columns:
+                    summary_df[p] = instance.params[p][0]
+
+                if htmlfile is not None:
+                    f = open(htmlfile, 'w')
+                    f.write(summary_df.to_html() + '\n')
+                    f.write(instance.params.to_html())
+                    f.close()
 
 def get_method_params(methods):
 
@@ -94,48 +116,7 @@ def get_method_params(methods):
 
     return method_params, [m.__name__ for m in methods], method_names
 
-def summarize(method_params, summary, results):
-    results_df = pd.concat([summary(r) for r in results])
-    results_df.index = method_params
-    results_df.index.name = str(tuple(method_params.columns))
-    return results_df
-
-# Specific to  FDR comparison
-
-def FDR_statistic(method, instance, X, Y, beta, l_theory, l_min, l_1se, sigma_reid):
-    toc = time.time()
-    M = method(X.copy(), Y.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
-    selected, active = M.select()
-    tic = time.time()
-    true_active = np.nonzero(beta)[0]
-
-    if active is not None:
-        TD = instance.discoveries(selected, true_active)
-        FD = len(selected) - TD
-        FDP = FD / max(TD + 1. * FD, 1.)
-        return TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)
-
-def FDR_summary(result):
-    result = np.atleast_2d(result)
-
-    return pd.DataFrame([[result.shape[0],
-                          np.mean(result[:,0]), 
-                          np.std(result[:,0]) / np.sqrt(result.shape[0]), 
-                          np.mean(result[:,1]), 
-                          np.mean(result[:,2]), 
-                          np.std(result[:,2]) / np.sqrt(result.shape[0]),
-                          np.mean(result[:,3]),
-                          np.mean(result[:,4])]],
-                        columns=['Replicates', 
-                                 'Full model power', 
-                                 'SD(Full model power)', 
-                                 'False discoveries', 
-                                 'Full model FDR', 
-                                 'SD(Full model FDR)', 
-                                 'Time', 
-                                 'Active'])
-
-def main(opts, clean=False):
+def main(opts):
 
     if opts.list_instances:
         print('Instances:\n')
@@ -201,29 +182,20 @@ def main(opts, clean=False):
                                                       new_opts.rho))
         csvfiles.append(new_opts.csvfile)
 
-        results_df, results = compare(instance,
-                                      FDR_statistic,
-                                      FDR_summary,
-                                      nsim=new_opts.nsim,
-                                      methods=_methods,
-                                      verbose=new_opts.verbose,
-                                      htmlfile=new_opts.htmlfile,
-                                      method_setup=method_setup,
-                                      csvfile=new_opts.csvfile)
-        results_dict[(rho, signal)] = results
-        if opts.csvfile is not None:
+        compare(instance,
+                FDR_statistic,
+                FDR_summary,
+                nsim=new_opts.nsim,
+                methods=_methods,
+                verbose=new_opts.verbose,
+                htmlfile=new_opts.htmlfile,
+                method_setup=method_setup,
+                csvfile=new_opts.csvfile)
 
-            f = open(new_opts.csvfile, 'w')
-            f.write('# parsed arguments: ' + str(new_opts) + '\n') # comment line indicating arguments used
-            f.write(results_df.to_csv() + '\n')
-            f.close()
+    # concat all csvfiles
 
-            dfs = [pd.read_csv(f, comment='#') for f in csvfiles]
-            df = pd.concat(dfs)
-            df.to_csv(opts.csvfile, index=False)
-
-    if opts.clean:
-        [os.remove(f) for f in csvfiles]
+    all_results = pd.concat([pd.read_csv(f) for f in csvfiles])
+    all_results.to_csv(opts.csvfile)
 
     return results_dict
 
@@ -275,8 +247,6 @@ Try:
                         dest='htmlfile')
     parser.add_argument('--csvfile', help='CSV file to store results looped over (signal, rho).',
                         dest='csvfile')
-    parser.add_argument('--clean', help='Remove individual CSV files after termination?',
-                        default=False)
     parser.add_argument('--all_methods', help='Run all methods.',
                         default=False,
                         action='store_true')

@@ -1,4 +1,5 @@
 import numpy as np
+import pandas as pd
 
 # Rpy
 
@@ -48,6 +49,18 @@ def BHfilter(pval, q=0.2):
     numpy2ri.deactivate()
     return np.asarray(S, np.int)
 
+def summarize(groupings,
+              results_df,
+              summary):
+
+    grouped = results_df.groupby(groupings, as_index=False)
+    summaries = []
+
+    summaries = [(n, summary(g)) for n, g in grouped]
+    summary_df = pd.concat([s for _, s in summaries])
+    summary_df.index = [n for n, _ in summaries]
+
+    return summary_df
 
 
 

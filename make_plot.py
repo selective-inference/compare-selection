@@ -5,17 +5,18 @@ import numpy as np
 import pandas as pd
 import seaborn as sns
 
-from gaussian_methods import methods
+from utils import summarize
+from compare import FDR_summary
 
+def feature_plot(param, power, color='r', label='foo', ylim=None, horiz=None):
+    ax = plt.gca()
+    ax.plot(param, power, 'o--', color=color, label=label)
+    ax.set_xticks(sorted(np.unique(param)))
+    if ylim is not None:
+        ax.set_ylim(ylim)
+    if horiz is not None:
+        ax.plot(ax.get_xticks(), horiz * np.ones(len(ax.get_xticks())), 'k--')
 
-def extract_results(df):
-
-    results = [v for v in df.groupby([df.index, 'class_name'])]
-    rho_results = [v for v in df.groupby([df.index, 'class_name', 'rho'])]
-    signal_results = [v for v in df.groupby([df.index, 'class_name', 'signal'])]
-
-    return results, rho_results, signal_results
-    
 def plot(df,
          fixed,
          param,
@@ -27,18 +28,17 @@ def plot(df,
 
     methods = methods or np.unique(df['class_name'])
 
+    df['Method'] = df['method_name']
     # plot with rho on x axis
-    g_plot = sns.FacetGrid(df, col=fixed, hue='method_name', sharex=True, sharey=True, col_wrap=2, size=5)
+    g_plot = sns.FacetGrid(df, col=fixed, hue='Method', sharex=True, sharey=True, col_wrap=2, size=5, legend_out=False)
     
-    def power_plot(param, power, color='r', label='foo'):
-        ax = plt.gca()
-        ax.plot(param, power, 'o--', color=color, label=label)
-        ax.set_xticks(sorted(np.unique(param)))
-        ax.set_ylim([0,1])
-
-    rendered_plot = g_plot.map(power_plot, 'rho', 'Full model power')
+    if feature == 'Full model power':
+        rendered_plot = g_plot.map(feature_plot, param, feature, ylim=(0,1))
+    elif feature == 'Full model FDR':
+        rendered_plot = g_plot.map(feature_plot, param, feature, ylim=(0,0.3), horiz=0.2)
     rendered_plot.add_legend()
     rendered_plot.savefig(outbase + '.pdf')
+    rendered_plot.savefig(outbase + '.png')
 
     return df
 
@@ -51,7 +51,7 @@ if __name__ == "__main__":
 Make plots for
 
 Try:
-    python make_plot.py --methods lee_theory liu_theory --csvbase indep.csv
+    python make_plot.py --methods lee_theory liu_theory --csvfile indep.csv
 ''')
     parser.add_argument('--methods', nargs='+',
                         dest='methods', 
@@ -68,20 +68,35 @@ Try:
                         dest='feature',
                         default='power',
                         help='Variable for y-axis')
-    parser.add_argument('--csvbase', help='Basename of csvfile.', dest='csvbase')
-    parser.add_argument('--outbase', help='Begginning of name of pdf / png files where results are plotted. Defaults to the base of csvfile.')
+    parser.add_argument('--csvfile', help='csvfile.', dest='csvfile')
+    parser.add_argument('--csvbase', help='csvfile.', dest='csvbase')
+    parser.add_argument('--outbase', help='Base of name of pdf file where results are plotted.')
 
     opts = parser.parse_args()
 
-    csvfiles = glob.glob(opts.csvbase + '*signal*rho*csv')
-    df = pd.concat([pd.read_csv(f, comment='#') for f in csvfiles])
+    if opts.csvbase is not None:
+        full_df = pd.concat([pd.read_csv(f) for f in glob.glob(opts.csvbase + '*signal*csv')])
+        full_df.to_csv(opts.csvbase + '.csv')
+        csvfile = opts.csvbase + '.csv'
+    else:
+        csvfile = opts.csvfile
 
-    df = plot(df,
-              opts.fixed,
-              opts.param,
-              {'power':'Full model power', 'fdr': 'Full model FDR'}[opts.feature],
-              opts.outbase,
-              methods=opts.methods)
+    if opts.param == opts.fixed:
+        raise ValueError('one should be rho, the other signal')
+
+    df = pd.read_csv(csvfile)
+    summary_df = summarize(['method_param',
+                            opts.param,
+                            opts.fixed],
+                           df,
+                           FDR_summary)
+
+    plot(summary_df,
+         opts.fixed,
+         opts.param,
+         {'power':'Full model power', 'fdr': 'Full model FDR'}[opts.feature],
+         opts.outbase,
+         methods=opts.methods)
 
 
 
