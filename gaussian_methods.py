@@ -1,4 +1,5 @@
 import tempfile, os, glob
+from scipy.stats import norm as ndist
 from traitlets import (HasTraits, 
                        Integer, 
                        Unicode, 
@@ -7,8 +8,7 @@ from traitlets import (HasTraits,
                        Instance, 
                        Dict, 
                        Bool,
-                       default, 
-                       observe)
+                       default)
 
 import numpy as np
 import regreg.api as rr
@@ -29,6 +29,8 @@ from rpy2.robjects import numpy2ri
 methods = {}
 
 class generic_method(HasTraits):
+
+    need_CV = False
 
     selectiveR_method = False
     wide_ok = True # ok for p>= n?
@@ -240,6 +242,8 @@ knockoffs_fixed.register()
 
 class parametric_method(generic_method):
 
+    confidence = Float(0.95)
+
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
         generic_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self._fit = False
@@ -276,7 +280,7 @@ class liu_theory(parametric_method):
             self._method_instance = lasso_full.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
         return self._method_instance
 
-    def generate_pvalues(self): 
+    def generate_summary(self, compute_intervals=False): 
 
         if not self._fit:
             self.method_instance.fit()
@@ -290,13 +294,26 @@ class liu_theory(parametric_method):
                 dispersion = self.sigma_reid**2
             else:
                 dispersion = None
-            S = L.summary(compute_intervals=False, dispersion=dispersion)
+            S = L.summary(compute_intervals=compute_intervals, dispersion=dispersion)
+            return S
+
+    def generate_pvalues(self):
+        S = self.generate_summary(compute_intervals=False)
+        if S is not None:
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
             return active_set, pvalues
         else:
             return [], []
 
+    def generate_intervals(self): 
+        S = self.generate_summary(compute_intervals=True)
+        if S is not None:
+            active_set = np.array(S['variable'])
+            lower, upper = np.asarray(S['lower']), np.asarray(S['upper'])
+            return active_set, lower, upper
+        else:
+            return [], [], []
 liu_theory.register()
 
 class liu_aggressive(liu_theory):
@@ -307,10 +324,6 @@ class liu_aggressive(liu_theory):
 
         liu_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
-
-    def generate_pvalues(self):
-        pval = liu_theory.generate_pvalues(self)
-        return pval
 
 liu_aggressive.register()
 
@@ -381,6 +394,8 @@ liu_aggressive_reid.register()
 
 class liu_CV(liu_theory):
             
+    need_CV = True
+
     lambda_choice = Unicode("CV")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
@@ -391,6 +406,8 @@ liu_CV.register()
 
 class liu_1se(liu_theory):
             
+    need_CV = True
+
     lambda_choice = Unicode("1se")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
@@ -398,6 +415,23 @@ class liu_1se(liu_theory):
         liu_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_1se * np.ones(X.shape[1])
 liu_1se.register()
+
+class liu_sparseinv_1se(liu_1se):
+
+    method_name = Unicode("Liu (debiased)")
+
+    """
+    Force the use of the debiasing matrix.
+    """
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = lasso_full.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
+            self._method_instance.sparse_inverse = True
+        return self._method_instance
+liu_sparseinv_1se.register()
 
 class liu_R_theory(liu_theory):
 
@@ -525,7 +559,7 @@ class lee_theory(parametric_method):
             self._method_instance = lasso.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
         return self._method_instance
 
-    def generate_pvalues(self):
+    def generate_summary(self, compute_intervals=False): 
 
         if not self._fit:
             self.method_instance.fit()
@@ -534,16 +568,43 @@ class lee_theory(parametric_method):
         X, Y, lagrange, L = self.X, self.Y, self.lagrange, self.method_instance
 
         if len(L.active) > 0:
-            S = L.summary(compute_intervals=False, alternative='onesided')
+            S = L.summary(compute_intervals=compute_intervals, alternative='onesided')
+            return S
+
+    def generate_pvalues(self):
+        S = self.generate_summary(compute_intervals=False)
+        if S is not None:
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
             return active_set, pvalues
         else:
             return [], []
+
+    def generate_intervals(self): 
+        S = self.generate_summary(compute_intervals=True)
+        if S is not None:
+            active_set = np.array(S['variable'])
+            lower, upper = np.asarray(S['lower']), np.asarray(S['upper'])
+            return active_set, lower, upper
+        else:
+            return [], [], []
+
+    def point_estimator(self):
+        X, Y, lagrange, L = self.X, self.Y, self.lagrange, self.method_instance
+        n, p = X.shape
+        beta_full = np.zeros(p)
+        if self.estimator == "LASSO":
+            beta_full[L.active] = L.soln
+        else:
+            beta_full[L.active] = L.onestep_estimator
+        return L.active, beta_full
+
 lee_theory.register()
 
 class lee_CV(lee_theory):
     
+    need_CV = True
+
     lambda_choice = Unicode("CV")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
@@ -555,6 +616,8 @@ lee_CV.register()
 
 class lee_1se(lee_theory):
     
+    need_CV = True
+
     lambda_choice = Unicode("1se")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
@@ -575,6 +638,17 @@ class lee_aggressive(lee_theory):
 
 lee_aggressive.register()
 
+class lee_weak(lee_theory):
+    
+    lambda_choice = Unicode("weak")
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
+
+        lee_theory.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        self.lagrange = 2 * l_theory * np.ones(X.shape[1])
+
+lee_weak.register()
+
 class sqrt_lasso(parametric_method):
 
     method_name = Unicode('SqrtLASSO')
@@ -588,22 +662,37 @@ class sqrt_lasso(parametric_method):
     @property
     def method_instance(self):
         if not hasattr(self, "_method_instance"):
-            self._method_instance = lasso.sqrt_lasso(self.X, self.Y, self.lagrange * np.sqrt(n))
+            self._method_instance = lasso.sqrt_lasso(self.X, self.Y, self.lagrange)
         return self._method_instance
 
-    def generate_pvalues(self):
+    def generate_summary(self, compute_intervals=False): 
 
         X, Y, lagrange, L = self.X, self.Y, self.lagrange, self.method_instance
         n, p = X.shape
         X = X / np.sqrt(n)
 
         if len(L.active) > 0:
-            S = L.summary(compute_intervals=False, alternative='onesided')
+            S = L.summary(compute_intervals=compute_intervals, alternative='onesided')
+            return S
+
+    def generate_pvalues(self):
+        S = self.generate_summary(compute_intervals=False)
+        if S is not None:
             active_set = np.array(S['variable'])
             pvalues = np.asarray(S['pval'])
             return active_set, pvalues
         else:
             return [], []
+
+    def generate_intervals(self): 
+        S = self.generate_summary(compute_intervals=True)
+        if S is not None:
+            active_set = np.array(S['variable'])
+            lower, upper = np.asarray(S['lower']), np.asarray(S['upper'])
+            return active_set, lower, upper
+        else:
+            return [], [], []
+sqrt_lasso.register()
 
 # Randomized selected
 
@@ -614,8 +703,8 @@ class randomized_lasso(parametric_method):
     lambda_choice = Unicode("theory")
     randomizer_scale = Float(1)
 
-    ndraw = 5000
-    burnin = 1000
+    ndraw = 15000
+    burnin = 2000
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -632,7 +721,7 @@ class randomized_lasso(parametric_method):
                                                                  randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
         return self._method_instance
 
-    def generate_pvalues(self):
+    def generate_summary(self, compute_intervals=False): 
 
         X, Y, lagrange, rand_lasso = self.X, self.Y, self.lagrange, self.method_instance
         n, p = X.shape
@@ -643,6 +732,7 @@ class randomized_lasso(parametric_method):
 
         signs = rand_lasso.fit()
         active_set = np.nonzero(signs)[0]
+
         active = signs != 0
 
         (observed_target, 
@@ -652,20 +742,33 @@ class randomized_lasso(parametric_method):
                                       rand_lasso.loglike,
                                       rand_lasso._W,
                                       active)
-        _, pvalues, _ = rand_lasso.summary(observed_target, 
-                                           cov_target, 
-                                           cov_target_score, 
-                                           alternatives,
-                                           ndraw=self.ndraw,
-                                           burnin=self.burnin,
-                                           compute_intervals=False)
-        if len(pvalues) > 0:
+        _, pvalues, intervals = rand_lasso.summary(observed_target, 
+                                                   cov_target, 
+                                                   cov_target_score, 
+                                                   alternatives,
+                                                   ndraw=self.ndraw,
+                                                   burnin=self.burnin,
+                                                   compute_intervals=compute_intervals)
+
+        return active_set, pvalues, intervals
+
+    def generate_pvalues(self, compute_intervals=False):
+        active_set, pvalues, _ = self.generate_summary(compute_intervals=compute_intervals)
+        if len(active_set) > 0:
             return active_set, pvalues
         else:
             return [], []
 
+    def generate_intervals(self): 
+        active_set, _, intervals = self.generate_summary(compute_intervals=True)
+        if len(active_set) > 0:
+            return active_set, intervals[:,0], intervals[:,1]
+        else:
+            return [], [], []
 
 class randomized_lasso_CV(randomized_lasso):
+
+    need_CV = True
 
     lambda_choice = Unicode("CV")
 
@@ -675,6 +778,8 @@ class randomized_lasso_CV(randomized_lasso):
         self.lagrange = l_min * np.ones(X.shape[1])
 
 class randomized_lasso_1se(randomized_lasso):
+
+    need_CV = True
 
     lambda_choice = Unicode("1se")
 
@@ -698,6 +803,7 @@ class randomized_lasso_aggressive(randomized_lasso):
 
 class randomized_lasso_aggressive_half(randomized_lasso):
 
+    lambda_choice = Unicode('aggressive')
     randomizer_scale = Float(0.5)
 
 
@@ -705,6 +811,18 @@ class randomized_lasso_aggressive_half(randomized_lasso):
 
         randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         self.lagrange = l_theory * np.ones(X.shape[1]) * 0.8
+
+class randomized_lasso_weak_half(randomized_lasso):
+
+    lambda_choice = Unicode('weak')
+    randomizer_scale = Float(0.5)
+
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
+
+        randomized_lasso.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+        self.lagrange = l_theory * np.ones(X.shape[1]) * 2.
+randomized_lasso_weak_half.register()
 
 class randomized_lasso_aggressive_quarter(randomized_lasso):
 
@@ -726,21 +844,68 @@ class randomized_lasso_half(randomized_lasso):
 
 class randomized_lasso_half_CV(randomized_lasso_CV):
 
+    need_CV = True
+
     randomizer_scale = Float(0.5)
     pass
 
 class randomized_lasso_half_1se(randomized_lasso_1se):
+
+    need_CV = True
 
     randomizer_scale = Float(0.5)
     pass
 
 randomized_lasso_half.register(), randomized_lasso_half_CV.register(), randomized_lasso_half_1se.register()
 
+# selective mle
+
+class randomized_lasso_mle(randomized_lasso_aggressive_half):
+
+    method_name = Unicode("Randomized MLE")
+    randomizer_scale = Float(0.5)
+    model = Unicode("selected")
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = randomized_modelQ(self.feature_cov * n,
+                                                      self.X,
+                                                      self.Y,
+                                                      self.lagrange * np.sqrt(n),
+                                                      randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
+        return self._method_instance
+
+    def generate_pvalues(self):
+        X, Y, lagrange, rand_lasso = self.X, self.Y, self.lagrange, self.method_instance
+        n, p = X.shape
+
+        if not self._fit:
+            signs = self.method_instance.fit()
+            self._fit = True
+
+        signs = rand_lasso.fit()
+        active_set = np.nonzero(signs)[0]
+        Z, pvalues = rand_lasso.selective_MLE(target=self.model, solve_args={'min_iter':1000, 'tol':1.e-12})[-3:-1]
+        print(pvalues, 'pvalues')
+        print(Z, 'Zvalues')
+        if len(pvalues) > 0:
+            return active_set, pvalues
+        else:
+            return [], []
+
+randomized_lasso_mle.register()
+
+
 # Using modelQ for randomized
 
 class randomized_lasso_half_pop_1se(randomized_lasso_half_1se):
 
     method_name = Unicode("Randomized ModelQ (pop)")
+    randomizer_scale = Float(0.5)
+    nsample = 15000
+    burnin = 2000
 
     @property
     def method_instance(self):
@@ -756,8 +921,10 @@ class randomized_lasso_half_pop_1se(randomized_lasso_half_1se):
 class randomized_lasso_half_semi_1se(randomized_lasso_half_1se):
 
     method_name = Unicode("Randomized ModelQ (semi-supervised)")
-
+    randomizer_scale = Float(0.5)
     B = 10000
+    nsample = 15000
+    burnin = 2000
 
     @classmethod
     def setup(cls, feature_cov):
@@ -789,6 +956,66 @@ class randomized_lasso_half_semi_1se(randomized_lasso_half_1se):
 
 randomized_lasso_half_pop_1se.register(), randomized_lasso_half_semi_1se.register()
 
+# Using modelQ for randomized
+
+class randomized_lasso_half_pop_aggressive(randomized_lasso_aggressive_half):
+
+    method_name = Unicode("Randomized ModelQ (pop)")
+
+    randomizer_scale = Float(0.5)
+    nsample = 10000
+    burnin = 2000
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = randomized_modelQ(self.feature_cov * n,
+                                                      self.X,
+                                                      self.Y,
+                                                      self.lagrange * np.sqrt(n),
+                                                      randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
+        return self._method_instance
+
+class randomized_lasso_half_semi_aggressive(randomized_lasso_aggressive_half):
+
+    method_name = Unicode("Randomized ModelQ (semi-supervised)")
+    randomizer_scale = Float(0.25)
+
+    B = 10000
+    nsample = 15000
+    burnin = 2000
+
+    @classmethod
+    def setup(cls, feature_cov):
+        cls.feature_cov = feature_cov
+        cls._chol = np.linalg.cholesky(feature_cov)
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+
+            # draw sample of X for semi-supervised method
+            _chol = self._chol
+            p = _chol.shape[0]
+            Q = 0
+            batch_size = int(self.B/10)
+            for _ in range(10):
+                X_semi = np.random.standard_normal((batch_size, p)).dot(_chol.T)
+                Q += X_semi.T.dot(X_semi)
+            Q += self.X.T.dot(self.X)
+            Q /= (10 * batch_size + self.X.shape[0])
+
+            n, p = self.X.shape
+            self._method_instance = randomized_modelQ(Q * n,
+                                                      self.X,
+                                                      self.Y,
+                                                      self.lagrange * np.sqrt(n),
+                                                      randomizer_scale=self.randomizer_scale * np.std(self.Y) * np.sqrt(n))
+        return self._method_instance
+
+randomized_lasso_half_pop_aggressive.register(), randomized_lasso_half_semi_aggressive.register()
+
 # Randomized sqrt selected
 
 class randomized_sqrtlasso(randomized_lasso):
@@ -809,7 +1036,7 @@ class randomized_sqrtlasso(randomized_lasso):
                                                                  randomizer_scale=self.randomizer_scale * np.std(self.Y))
         return self._method_instance
 
-    def generate_pvalues(self):
+    def generate_summary(self, compute_intervals=False):
         X, Y, rand_lasso = self.X, self.Y, self.method_instance
         n, p = X.shape
         X = X / np.sqrt(n)
@@ -820,6 +1047,7 @@ class randomized_sqrtlasso(randomized_lasso):
 
         signs = self.method_instance.selection_variable['sign']
         active_set = np.nonzero(signs)[0]
+
         active = signs != 0
 
 
@@ -830,18 +1058,18 @@ class randomized_sqrtlasso(randomized_lasso):
                                       rand_lasso.loglike,
                                       rand_lasso._W,
                                       active)
-        _, pvalues, _ = rand_lasso.summary(observed_target, 
-                                           cov_target, 
-                                           cov_target_score, 
-                                           alternatives,
-                                           ndraw=self.ndraw,
-                                           burnin=self.burnin,
-                                           compute_intervals=False)
+        _, pvalues, intervals = rand_lasso.summary(observed_target, 
+                                                   cov_target, 
+                                                   cov_target_score, 
+                                                   alternatives,
+                                                   ndraw=self.ndraw,
+                                                   burnin=self.burnin,
+                                                   compute_intervals=compute_intervals)
 
         if len(pvalues) > 0:
-            return active_set, pvalues
+            return active_set, pvalues, intervals
         else:
-            return [], []
+            return [], [], []
 
 
 class randomized_sqrtlasso_half(randomized_sqrtlasso):
@@ -877,6 +1105,8 @@ class randomized_lasso_full(randomized_lasso):
 
 class randomized_lasso_full_CV(randomized_lasso_full):
 
+    need_CV = True
+
     lambda_choice = Unicode("CV")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
@@ -885,6 +1115,8 @@ class randomized_lasso_full_CV(randomized_lasso_full):
         self.lagrange = l_min * np.ones(X.shape[1])
 
 class randomized_lasso_full_1se(randomized_lasso_full):
+
+    need_CV = True
 
     lambda_choice = Unicode("1se")
 
@@ -908,6 +1140,8 @@ class randomized_lasso_full_half_CV(randomized_lasso_full_CV):
     pass
 
 class randomized_lasso_full_half_1se(randomized_lasso_full_1se):
+
+    need_CV = True
 
     randomizer_scale = Float(0.5)
     pass
@@ -969,3 +1203,47 @@ class randomized_lasso_R_theory(randomized_lasso):
         else:
             return [], []
 randomized_lasso_R_theory.register()
+
+class data_splitting_1se(parametric_method):
+
+    method_name = Unicode('Data splitting')
+    selection_frac = Float(0.5)
+
+    def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
+
+        parametric_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
+
+        self.lagrange = l_1se * np.ones(X.shape[1])
+
+        n, p = self.X.shape
+        n1 = int(self.selection_frac * n)
+        X1, X2 = self.X1, self.X2 = self.X[:n1], self.X[n1:]
+        Y1, Y2 = self.Y1, self.Y2 = self.Y[:n1], self.Y[n1:]
+
+        pen = rr.weighted_l1norm(np.sqrt(n1) * self.lagrange, lagrange=1.)
+        loss = rr.squared_error(X1, Y1)
+        problem = rr.simple_problem(loss, pen)
+        soln = problem.solve()
+
+        self.active_set = np.nonzero(soln)[0]
+        self.signs = np.sign(soln)[self.active_set]
+
+        self._fit = True
+
+    def generate_pvalues(self):
+
+        X2, Y2 = self.X2[:,self.active_set], self.Y2
+        if len(self.active_set) > 0:
+            s = len(self.active_set)
+            X2i = np.linalg.inv(X2.T.dot(X2))
+            beta2 = X2i.dot(X2.T.dot(Y2))
+            resid2 = Y2 - X2.dot(beta2)
+            n2 = X2.shape[0]
+            sigma2 = np.sqrt((resid2**2).sum() / (n2 - s))
+            Z2 = beta2 / np.sqrt(sigma2**2 * np.diag(X2i))
+            signed_Z2 = self.signs * Z2
+            pvalues = 1 - ndist.cdf(signed_Z2)
+            return self.active_set, pvalues
+        else:
+            return [], []
+data_splitting_1se.register()

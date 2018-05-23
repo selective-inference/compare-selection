@@ -20,6 +20,7 @@ data_instances = {}
 class data_instance(HasTraits):
 
     distance_tol = Float(0)
+    cor_thresh = Float(0.5)
 
     def generate(self):
         raise NotImplementedError('abstract method should return (X,Y,beta)')
@@ -43,7 +44,7 @@ class equicor_instance(data_instance):
     n = Integer(500)
     p = Integer(200)
     s = Integer(20)
-    rho = Float(0.5)
+    rho = Float(0.0)
     l_theory = Float()
     feature_cov = Instance(np.ndarray)
     signal = Float(4.)
@@ -72,12 +73,12 @@ class equicor_instance(data_instance):
     @observe('rho')
     def _observe_rho(self, change):
         rho = change['new']
-        if rho < 0.25:
-            self.distance_tol = 0
-        elif rho < 0.5:
-            self.distance_tol = 1
-        else:
-            self.distance_tol = 2
+        cor = rho
+        tol = 0
+        while cor >= self.cor_thresh:
+            cor *= rho
+            tol += 1
+        self.distance_tol = tol
 
     @default('feature_cov')
     def _default_feature_cov(self):
