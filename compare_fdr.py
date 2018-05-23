@@ -140,7 +140,6 @@ def main(opts):
     prev_rho = np.nan
 
     csvfiles = []
-    results_dict = {}
 
     if opts.all_methods_noR: # noR takes precedence if both are used
         new_opts.methods = sorted([n for n, m in methods.items() if not m.selectiveR_method])
@@ -198,11 +197,9 @@ def main(opts):
 
     # concat all csvfiles
 
-    all_results = pd.concat([pd.read_csv(f) for f in csvfiles])
-    all_results.to_csv(opts.csvfile)
-
-    return results_dict
-
+    if opts.csvfile is not None:
+        all_results = pd.concat([pd.read_csv(f) for f in csvfiles])
+        all_results.to_csv(opts.csvfile)
 
 if __name__ == "__main__":
 
@@ -266,8 +263,6 @@ Try:
                         type=float)
 
     opts = parser.parse_args()
-    if opts.csvfile is None:
-        raise ValueError('need a csvfile to store the results')
 
     results = main(opts)
 
