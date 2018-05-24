@@ -1,24 +1,47 @@
 import numpy as np, pandas as pd, time
 
-def pvalue_statistic(method, instance, X, Y, beta, l_theory, l_min, l_1se, sigma_reid):
+def interval_statistic(method, instance, X, Y, beta, l_theory, l_min, l_1se, sigma_reid):
 
     toc = time.time()
     M = method(X.copy(), Y.copy(), l_theory.copy(), l_min, l_1se, sigma_reid)
 
-    active, pvalues = M.generate_pvalues()
+    active, lower, upper = M.generate_intervals()
+    target = M.get_target(active, beta) # for now limited to Gaussian methods
     tic = time.time()
 
     if len(active) > 0:
-        value = pd.DataFrame(pvalues, columns=['P-value'])
+        value = pd.DataFrame({'active_variable':active,
+                             'lower_confidence':lower,
+                             'upper_confidence':upper,
+                             'target':target})
         value['Time'] = tic-toc
-        return value
+        return M, value
+    else:
+        return M, None
 
-def pvalue_summary(result):
+def interval_summary(result):
 
-    value = pd.DataFrame([[np.mean(result['P-value']), 
-                           np.std(result['P-value'])]],
-                         columns=['P-value',
-                                  'SD(P-value)'])
+    coverage = (np.asarray(result['lower_confidence'] <= result['target']) *
+                np.asarray(result['upper_confidence'] >= result['target']))
+    length = result['upper_confidence'] - result['lower_confidence']
+
+    instances = result.groupby('instance_id')
+    active_length = np.mean([len(g.index) for _, g in instances])
+
+    value = pd.DataFrame([[len(np.unique(result['instance_id'])),
+                           np.mean(coverage),
+                           np.std(coverage),
+                           np.median(length),
+                           np.mean(length),
+                           active_length,
+                           result['model_target'].values[0]]],
+                         columns=['Replicates',
+                                  'Coverage',
+                                  'SD(Coverage)',
+                                  'Median length',
+                                  'Mean length',
+                                  'Active',
+                                  'Model'])
 
     # keep all things constant over groups
 
@@ -39,19 +62,19 @@ def FDR_statistic(method, instance, X, Y, beta, l_theory, l_min, l_1se, sigma_re
         TD = instance.discoveries(selected, true_active)
         FD = len(selected) - TD
         FDP = FD / max(TD + 1. * FD, 1.)
-        return pd.DataFrame([[TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)]],
-                            columns=['Full model power',
-                                     'False discoveries',
-                                     'Full model FDP',
-                                     'Time',
-                                     'Active'])
+        return M, pd.DataFrame([[TD / (len(true_active)*1.), FD, FDP, tic-toc, len(active)]],
+                               columns=['Full model power',
+                                        'False discoveries',
+                                        'Full model FDP',
+                                        'Time',
+                                        'Active'])
     else:
-        return pd.DataFrame([[0, 0, 0, tic-toc, 0]],
-                            columns=['Full model power',
-                                     'False discoveries',
-                                     'Full model FDP',
-                                     'Time',
-                                     'Active'])
+        return M, pd.DataFrame([[0, 0, 0, tic-toc, 0]],
+                               columns=['Full model power',
+                                        'False discoveries',
+                                        'Full model FDP',
+                                        'Time',
+                                        'Active'])
 
 def FDR_summary(result):
 
@@ -63,7 +86,8 @@ def FDR_summary(result):
                            np.mean(result['Full model FDP']), 
                            np.std(result['Full model FDP']) / np.sqrt(nresult),
                            np.mean(result['Time']),
-                           np.mean(result['Active'])]],
+                           np.mean(result['Active']),
+                           result['model_target'].values[0]]],
                          columns=['Replicates', 
                                   'Full model power', 
                                   'SD(Full model power)', 
@@ -72,6 +96,7 @@ def FDR_summary(result):
                                   'SD(Full model FDR)', 
                                   'Time', 
                                   'Active',
+                                  'Model'
                                   ])
 
     # keep all things constant over groups

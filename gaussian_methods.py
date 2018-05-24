@@ -39,7 +39,7 @@ class generic_method(HasTraits):
 
     q = Float(0.2)
     method_name = Unicode('Generic method')
-    model = Unicode()
+    model_target = Unicode()
 
     @classmethod
     def setup(cls, feature_cov):
@@ -65,13 +65,29 @@ class generic_method(HasTraits):
     def register(cls):
         methods[cls.__name__] = cls
 
+    def selected_target(self, active, beta):
+        C = self.feature_cov[active]
+        Q = C[:,active]
+        return np.linalg.inv(Q).dot(C.dot(beta))
+
+    def full_target(self, active, beta):
+        return beta[active]
+
+    def get_target(self, active, beta):
+        if self.model_target not in ['selected', 'full']:
+            raise ValueError('Gaussian methods only have selected or full targets')
+        if self.model_target == 'full':
+            return self.full_target(active, beta)
+        else:
+            return self.selected_target(active, beta)
+
 # Knockoff selection
 
 class knockoffs_mf(generic_method):
 
     method_name = Unicode('Knockoffs')
     knockoff_method = Unicode('Second order')
-    model = Unicode("full")
+    model_target = Unicode("full")
 
     def select(self):
         try:
@@ -94,7 +110,7 @@ class knockoffs_sigma(generic_method):
     factor_method = 'asdp'
     method_name = Unicode('Knockoffs')
     knockoff_method = Unicode("ModelX (asdp)")
-    model = Unicode("full")
+    model_target = Unicode("full")
 
     @classmethod
     def setup(cls, feature_cov):
@@ -195,7 +211,7 @@ class knockoffs_orig(generic_method):
 
     method_name = Unicode("Knockoffs")
     knockoff_method = Unicode('Candes & Barber')
-    model = Unicode('full')
+    model_target = Unicode('full')
 
     def select(self):
         try:
@@ -220,7 +236,7 @@ class knockoffs_fixed(generic_method):
 
     method_name = Unicode("Knockoffs")
     knockoff_method = Unicode('Fixed')
-    model = Unicode('full')
+    model_target = Unicode('full')
 
     def select(self):
         try:
@@ -266,7 +282,7 @@ class liu_theory(parametric_method):
     sigma_estimator = Unicode('relaxed')
     method_name = Unicode("Liu")
     lambda_choice = Unicode("theory")
-    model = Unicode("full")
+    model_target = Unicode("full")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
@@ -313,7 +329,7 @@ class liu_theory(parametric_method):
         S = self.generate_summary(compute_intervals=True)
         if S is not None:
             active_set = np.array(S['variable'])
-            lower, upper = np.asarray(S['lower']), np.asarray(S['upper'])
+            lower, upper = np.asarray(S['lower_confidence']), np.asarray(S['upper_confidence'])
             return active_set, lower, upper
         else:
             return [], [], []
@@ -547,7 +563,7 @@ lee_full_R_aggressive.register()
 
 class lee_theory(parametric_method):
     
-    model = Unicode("selected")
+    model_target = Unicode("selected")
     method_name = Unicode("Lee")
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
@@ -587,7 +603,7 @@ class lee_theory(parametric_method):
         S = self.generate_summary(compute_intervals=True)
         if S is not None:
             active_set = np.array(S['variable'])
-            lower, upper = np.asarray(S['lower']), np.asarray(S['upper'])
+            lower, upper = np.asarray(S['lower_confidence']), np.asarray(S['upper_confidence'])
             return active_set, lower, upper
         else:
             return [], [], []
@@ -691,7 +707,7 @@ class sqrt_lasso(parametric_method):
         S = self.generate_summary(compute_intervals=True)
         if S is not None:
             active_set = np.array(S['variable'])
-            lower, upper = np.asarray(S['lower']), np.asarray(S['upper'])
+            lower, upper = np.asarray(S['lower_confidence']), np.asarray(S['upper_confidence'])
             return active_set, lower, upper
         else:
             return [], [], []
@@ -702,7 +718,7 @@ sqrt_lasso.register()
 class randomized_lasso(parametric_method):
 
     method_name = Unicode("Randomized LASSO")
-    model = Unicode("selected")
+    model_target = Unicode("selected")
     lambda_choice = Unicode("theory")
     randomizer_scale = Float(1)
 
@@ -741,19 +757,22 @@ class randomized_lasso(parametric_method):
         (observed_target, 
          cov_target, 
          cov_target_score, 
-         alternatives) = form_targets(self.model,
+         alternatives) = form_targets(self.model_target,
                                       rand_lasso.loglike,
                                       rand_lasso._W,
                                       active)
-        _, pvalues, intervals = rand_lasso.summary(observed_target, 
-                                                   cov_target, 
-                                                   cov_target_score, 
-                                                   alternatives,
-                                                   ndraw=self.ndraw,
-                                                   burnin=self.burnin,
-                                                   compute_intervals=compute_intervals)
+        if active.sum() > 0:
+            _, pvalues, intervals = rand_lasso.summary(observed_target, 
+                                                       cov_target, 
+                                                       cov_target_score, 
+                                                       alternatives,
+                                                       ndraw=self.ndraw,
+                                                       burnin=self.burnin,
+                                                       compute_intervals=compute_intervals)
 
-        return active_set, pvalues, intervals
+            return active_set, pvalues, intervals
+        else:
+            return [], [], []
 
     def generate_pvalues(self, compute_intervals=False):
         active_set, pvalues, _ = self.generate_summary(compute_intervals=compute_intervals)
@@ -867,7 +886,7 @@ class randomized_lasso_mle(randomized_lasso_aggressive_half):
 
     method_name = Unicode("Randomized MLE")
     randomizer_scale = Float(0.5)
-    model = Unicode("selected")
+    model_target = Unicode("selected")
 
     @property
     def method_instance(self):
@@ -890,7 +909,8 @@ class randomized_lasso_mle(randomized_lasso_aggressive_half):
 
         signs = rand_lasso.fit()
         active_set = np.nonzero(signs)[0]
-        Z, pvalues = rand_lasso.selective_MLE(target=self.model, solve_args={'min_iter':1000, 'tol':1.e-12})[-3:-1]
+        Z, pvalues = rand_lasso.selective_MLE(target=self.model_target, 
+                                              solve_args={'min_iter':1000, 'tol':1.e-12})[-3:-1]
         print(pvalues, 'pvalues')
         print(Z, 'Zvalues')
         if len(pvalues) > 0:
@@ -1024,7 +1044,7 @@ randomized_lasso_half_pop_aggressive.register(), randomized_lasso_half_semi_aggr
 class randomized_sqrtlasso(randomized_lasso):
 
     method_name = Unicode("Randomized SqrtLASSO")
-    model = Unicode("selected")
+    model_target = Unicode("selected")
     randomizer_scale = Float(1)
     kappa = Float(0.7)
 
@@ -1057,7 +1077,7 @@ class randomized_sqrtlasso(randomized_lasso):
         (observed_target, 
          cov_target, 
          cov_target_score, 
-         alternatives) = form_targets(self.model,
+         alternatives) = form_targets(self.model_target,
                                       rand_lasso.loglike,
                                       rand_lasso._W,
                                       active)
@@ -1099,7 +1119,7 @@ randomized_sqrtlasso_bigger.register(), randomized_sqrtlasso_bigger_half.registe
 
 class randomized_lasso_full(randomized_lasso):
 
-    model = Unicode('full')
+    model_target = Unicode('full')
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
