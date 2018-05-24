@@ -283,13 +283,14 @@ class liu_theory(parametric_method):
     method_name = Unicode("Liu")
     lambda_choice = Unicode("theory")
     model_target = Unicode("full")
+    dispersion = Float(0.)
 
     def __init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid):
 
         parametric_method.__init__(self, X, Y, l_theory, l_min, l_1se, sigma_reid)
         n, p = X.shape
         if n < p:
-            self.method_name = 'Liu (debiased)'
+            self.method_name = 'ROSI'
         self.lagrange = l_theory * np.ones(X.shape[1])
 
     @property
@@ -311,6 +312,8 @@ class liu_theory(parametric_method):
         if len(L.active) > 0:
             if self.sigma_estimator == 'reid' and n < p:
                 dispersion = self.sigma_reid**2
+            elif self.dispersion != 0:
+                dispersion = self.dispersion
             else:
                 dispersion = None
             S = L.summary(compute_intervals=compute_intervals, dispersion=dispersion)
@@ -390,7 +393,7 @@ liu_modelQ_semi_aggressive.register()
 
 class liu_sparseinv_aggressive(liu_aggressive):
 
-    method_name = Unicode("Liu (debiased)")
+    method_name = Unicode("ROSI")
 
     """
     Force the use of the debiasing matrix.
@@ -437,7 +440,7 @@ liu_1se.register()
 
 class liu_sparseinv_1se(liu_1se):
 
-    method_name = Unicode("Liu (debiased)")
+    method_name = Unicode("ROSI")
 
     """
     Force the use of the debiasing matrix.
@@ -451,6 +454,24 @@ class liu_sparseinv_1se(liu_1se):
             self._method_instance.sparse_inverse = True
         return self._method_instance
 liu_sparseinv_1se.register()
+
+class liu_sparseinv_1se_known(liu_1se):
+
+    method_name = Unicode("ROSI - known")
+    dispersion = Float(1.)
+
+    """
+    Force the use of the debiasing matrix.
+    """
+
+    @property
+    def method_instance(self):
+        if not hasattr(self, "_method_instance"):
+            n, p = self.X.shape
+            self._method_instance = lasso_full.gaussian(self.X, self.Y, self.lagrange * np.sqrt(n))
+            self._method_instance.sparse_inverse = True
+        return self._method_instance
+liu_sparseinv_1se_known.register()
 
 class liu_R_theory(liu_theory):
 

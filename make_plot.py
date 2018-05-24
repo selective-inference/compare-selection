@@ -6,7 +6,7 @@ import pandas as pd
 import seaborn as sns
 
 from utils import summarize
-from compare import FDR_summary
+from statistics import FDR_summary
 
 def feature_plot(param, power, color='r', label='foo', ylim=None, horiz=None):
     ax = plt.gca()

@@ -28,6 +28,8 @@ def interval_summary(result):
     instances = result.groupby('instance_id')
     active_length = np.mean([len(g.index) for _, g in instances])
 
+    # XXX we should group by instances before averaging and computing SD
+
     value = pd.DataFrame([[len(np.unique(result['instance_id'])),
                            np.mean(coverage),
                            np.std(coverage),
